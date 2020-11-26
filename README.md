@@ -1,4 +1,7 @@
 # simple_gce
+
+# CURRENTLY NON-FUNCTIONAL. I AM IN THE PROCESS OF UPDATING THE CODE SO THAT IT CAN BE USED MORE GENERALLY. ONCE IT'S READY TO GO I WILL REMOVE THIS MESSAGE AND ADD USAGE EXAMPLES.
+
 A simple one-zone Galactic Chemical Evolution model, as used in [Grimmett et al. (2020)](https://arxiv.org/abs/1911.05901). 
 
 simple_gce solves the set of differential equations that represent a simplified model for an evolving galaxy.
