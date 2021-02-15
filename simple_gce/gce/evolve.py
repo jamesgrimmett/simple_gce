@@ -9,17 +9,9 @@ TODO: add a typical usage example, including setup, evolve, and plotting
 results.
 """
 
-def simple_gce():
-    """The main function to call, to evolve the galaxy.
-
-    Attributes:
-        models_cc: A dataframe containing the core-collapse model information
-                    and yields.
-        models_ia: A dataframe containing the Type Ia model information and
-                    yields.
-        models_agb: A dataframe containing the AGB model information and yields.
-        
-    
+def main():
+    """
+    The main function to call, to evolve the galaxy.
     """"
 
     nuclei = cfg.SETUP['nuclei']
