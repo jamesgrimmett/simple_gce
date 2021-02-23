@@ -3,6 +3,7 @@ import numpy as np
 
 from ..io import load_stellar_models
 from ..utils import chem_elements
+from . import generate_imf
 from .. import config
 
 el2z = chem_elements.el2z 
@@ -36,28 +37,42 @@ class Galaxy(object):
         # other data will be output to file on disk. 
         self.historical_Z = np.array([[self.time, self.Z]])
         self.historical_sfr = np.array([[self.time, self.sfr]])
+        self.imf = generate_imf.IMF(stellar_models = self.stellar_models, slope = config.IMF_PARAMS['slope'])
 
 
     def evolve(self, dt):
         """
         """
 
+        elements = self.elements
         time = self.time
 
-        time = 1.e6
+        time = 1.e9
 
         stellar_models = self.stellar_models
+        imf = self.imf
         historical_Z = self.historical_Z
         historical_sfr = self.historical_sfr
         Z = self.Z
         sfr = self.sfr
-        CC_models = stellar_models[(stellar_models.type == 'CC') & (stellar_models.lifetime <= time) & (stellar_models.Z <= Z)]
-        # Will this work with high resolution stellar lifetime and Z?
-        CC_models = CC_models[CC_models.Z == CC_models.Z.max()]
-        CC_birthtimes = time - np.array(CC_models.lifetime)
-        CC_sfr_birth = self._get_historical_value(historical_sfr,CC_birthtimes) 
-        CC_Z_birth = self._get_historical_value(historical_Z,CC_birthtimes) 
-        E_CC = (CC_models.mass_final - CC_models.remnant_mass)  
+        # time and metallicity at the point of formation for each stellar model
+        stellar_models['t_birth'] = time - np.array(stellar_models.lifetime)
+        Z_birth = self._get_historical_value(historical_Z,stellar_models.t_birth) 
+        # extract the models with Z == Z_birth for each stellar mass
+        models = self._filter_stellar_models(stellar_models,Z_birth)
+        if not models.mass.is_unique:
+            raise error_handling.ProgramError("Unable to filter stellar models")
+
+        CC_models = models[(models.type == 'CC')]
+        CC_models_imfdm = imf.imfdm(m = CC_models.mass)
+
+        CC_sfr_birth = self._get_historical_value(historical_sfr,CC_models.t_birth) 
+        # (mass - winds - remnant_mass) * SFR_birth * IMFdm
+        E_CC_tmp = (CC_models.mass_final - CC_models.remnant_mass) * CC_sfr_birth * CC_models_imfdm
+        # SUM[(mass - winds - remnant_mass) * SFR_birth * IMFdm]
+        E_CC = E_CC_tmp.sum()
+        # SUM[(mass - winds - remnant_mass) * X_cc * SFR_birth * IMFdm]
+        E_CC_X = CC_models[elements].mul(E_CC_tmp, axis = 'rows')
         zz
 
 
@@ -130,6 +145,21 @@ class Galaxy(object):
                 times. Ordering matches the time_array provided.
         """
 
-            values = np.array([historical_array[historical_aray[:,0] <= t][-1][-1] for t in time_array])
+        values = np.array([historical_array[historical_array[:,0] <= t][-1][-1] for t in time_array])
             
-            return values
+        return values
+    
+    def _filter_stellar_models(self,stellar_models,Z_birth):
+        """
+        Extract model with Z == Z_birth for each stellar mass.
+        """
+
+        time = self.time
+        Z = self.Z
+        stellar_models['Z_diff'] = abs(stellar_models.Z - Z_birth)
+        models = stellar_models[(stellar_models.lifetime <= time) & (stellar_models.Z <= Z)]
+        idx = stellar_models.groupby('mass').Z_diff.idxmin().to_list()
+        stellar_models = stellar_models[stellar_models.index.isin(idx)] 
+        stellar_models.drop(columns = ['Z_diff'], inplace = True)
+
+        return stellar_models
