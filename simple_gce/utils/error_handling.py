@@ -13,3 +13,7 @@ class NotImplementedError(Exception):
         self.message = message
         super().__init__(self.message)
 
+class ProgramError(Exception):
+    def __init__(self, message="Error in the model."):
+        self.message = message
+        super().__init__(self.message)
