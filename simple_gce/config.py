@@ -11,9 +11,10 @@ FILEPATHS = {
     'test_stellar_models' : [os.path.join(INSTALL_DIR,'data/test_stellar_models.csv')],
 }
 
-IMF = {
+IMF_PARAMS = {
     'mass_min' : 0.05,  # solar masses, minimum stellar mass.
     'mass_max' : 100.0, # solar masses, maximum stellar mass.
+    'slope'    : 1.35,  # exponent of the IMF (phi(m) = m**-slope).
 }
 
 STELLAR_MODELS = {
