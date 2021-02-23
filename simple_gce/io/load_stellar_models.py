@@ -19,7 +19,7 @@ def read_csv(test = False):
         df_ = pd.read_csv(fp)
         df = pd.concat((df,df_))
 
-    check_stellar_models.check_initial(df) 
+    df = check_stellar_models.check_initial(df) 
 
     return df
 
