@@ -1,7 +1,11 @@
 """Check stellar model data for completeness, inconsistencies, etc."""
 from ..utils import chem_elements, error_handling
+from ..gce import approx_agb
 from .. import config
 import warnings
+
+#TODO:
+# check mass limits provided in config. 
 
 def check_initial(df):
     """
@@ -13,8 +17,10 @@ def check_initial(df):
     Returns:
 
     """
-    check_columns(df)
-    check_model_types(df)
+    df = check_columns(df)
+    df = check_model_types(df)
+
+    return df
 
 def check_columns(df):
     """
@@ -56,6 +62,7 @@ def check_columns(df):
     elif len(unknown_columns) != 0:
         raise error_handling.UnknownCaseError("Unknown columns/elements in stellar data.")
 
+    return df
 
 def check_model_types(df):
     """
@@ -79,12 +86,10 @@ def check_model_types(df):
         message = f"No AGB models found. Wind mass from stars with mass < {mass_min_cc} Msun will be approximated, and wind chemical composition will be unchanged from formation."
         warnings.warn(message)
 
-        #df = module.approximate_AGB(df)
+        df = approx_agb.fill_agb(df)
 
     if 'HN' not in types:
         message = 'HNe are not included.'
         warnings.warn(message)
 
-def to_do_checks():
-    # check mass limits provided in config. 
-    
+    return df
