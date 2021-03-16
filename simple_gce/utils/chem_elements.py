@@ -1,5 +1,8 @@
 """Chemical element utilities."""
 
+#TODO
+# - implement isotopes
+
 el2z = {'H': 1,
         'He': 2,
         'Li': 3,
@@ -60,7 +63,46 @@ el2z = {'H': 1,
         'Ce': 58,
         'Pr': 59,
         'Nd': 60,
-        }
+        'Pm': 61,
+        'Sm': 62,
+        'Eu': 63,
+        'Gd': 64,
+        'Tb': 65,
+        'Dy': 66,
+        'Ho': 67,
+        'Er': 68,
+        'Tm': 69,
+        'Yb': 70,
+        'Lu': 71,
+        'Hf': 72,
+        'Ta': 73,
+        'W': 74,
+        'Re': 75,
+        'Os': 76,
+        'Ir': 77,
+        'Pt': 78,
+        'Au': 79,
+        'Hg': 80,
+        'Tl': 81,
+        'Pb': 82,
+        'Bi': 83,
+        'Po': 84,
+        'At': 85,
+        'Rn': 86,
+        'Fr': 87,
+        'Ra': 88,
+        'Ac': 89,
+        'Th': 90,
+        'Pa': 91,
+        'U': 92,
+        'Np': 93,
+        'Pu': 94,
+        'Am': 95,
+        'Cm': 96,
+        'Bk': 97,
+        'Cf': 98,
+        'Es': 99,
+        'Fm': 100}
 
 z2el = {z:el for el,z in el2z.items()}
 

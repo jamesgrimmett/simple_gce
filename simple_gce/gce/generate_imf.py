@@ -21,19 +21,19 @@ class IMF(object):
         self.dms = self.mass_bins[:,1] - self.mass_bins[:,0]
         self._test_imf()
 
-    def imfdm(self,m):
+    def imfdm(self,mass_list):
         """
         """
         try:
-            iter(m)
+            iter(mass_list)
         except TypeError as err:
-            m = [m]
+            mass_list = [mass_list]
         masses = self.masses
         mass_bins = self.mass_bins
-        if not set(m).issubset(masses):
-            raise error_handling.ProgramError(f"Unable to find mass {m} in the discretised IMF")
+        if not set(mass_list).issubset(masses):
+            raise error_handling.ProgramError(f"Unable to find mass {mass_list} in the discretised IMF")
         # there must be a cleaner way to get these indices
-        idx = [int(np.squeeze(np.where(masses == m_))) for m_ in m]
+        idx = [int(np.squeeze(np.where(masses == m_))) for m_ in mass_list]
         result = self.integrate(lower = mass_bins[idx,0], upper = mass_bins[idx,1])
 
         return result
@@ -87,7 +87,7 @@ class IMF(object):
     def _test_imf(self):
         """
         """
-        check = np.sum(self.imfdm(m = self.masses)) - 1.0
+        check = np.sum(self.imfdm(mass_list = self.masses)) - 1.0
         if abs(check) >= 1.e-5:
             raise error_handling.ProgramError("Error in the IMF implementation. Does not sum to unity.")
 
