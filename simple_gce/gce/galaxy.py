@@ -1,4 +1,5 @@
 """Galaxy class object."""
+
 import numpy as np
 
 from ..io import load_stellar_models
