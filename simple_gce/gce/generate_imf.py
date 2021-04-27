@@ -7,16 +7,14 @@ from ..utils import error_handling
 class IMF(object):
     """
     """
-    def __init__(self, stellar_models, slope):
+    def __init__(self, masses, slope):
         self.mass_min = config.IMF_PARAMS['mass_min']
         self.mass_max = config.IMF_PARAMS['mass_max']
         self.mass_min_cc = config.STELLAR_MODELS['mass_min_cc']
         self.slope = slope
         # normalising total mass to 1.0
         self.imf_norm = (1.0 - self.slope) / (self.mass_max**(1.0 - self.slope) - self.mass_min**(1.0 - self.slope))
-        self.stellar_models = stellar_models
-        self._check_models_compatible()
-        self.masses = stellar_models.mass.unique()
+        self.masses = masses
         self.mass_bins = self._generate_mass_bins()
         self.dms = self.mass_bins[:,1] - self.mass_bins[:,0]
         self._test_imf()
@@ -68,22 +66,6 @@ class IMF(object):
 
         return mass_bins
     
-    def _check_models_compatible(self):
-        """
-        Ensure that the stellar model dataset is compatible with this
-        implementation of the IMF. 
-        """
-        stellar_models = self.stellar_models
-
-        Z_unique = stellar_models.Z.unique()
-        mass_unique = stellar_models.mass.unique()
-
-        for m in mass_unique:
-            Z_vals = stellar_models[stellar_models.mass == m].Z.unique()
-            check = sorted(Z_vals) == sorted(Z_unique)
-            if not check:
-                raise error_handling.UnknownCaseError("Error building the IMF; a constistent set of masses must be provided for each value of metallicity in the stellar model set.")
-            
     def _test_imf(self):
         """
         """

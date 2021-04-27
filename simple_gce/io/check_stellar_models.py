@@ -36,6 +36,7 @@ def check_initial(df):
     df = check_model_types(df)
     check_columns(df)
     df = check_missing_vals(df)
+    check_mass_metallicity_consistent(df)
 
     return df
 
@@ -127,7 +128,7 @@ def check_massfracs(df):
     diff = abs(check - 1.0)
 
     if diff.max() >= 1.e-3:
-        error_handling.ProgramError("Large errors in sum(mass fractions) for stellar models")
+        raise error_handling.ProgramError("Large errors in sum(mass fractions) for stellar models")
 
     scale = 1 / check
 
@@ -135,5 +136,15 @@ def check_massfracs(df):
 
     check2 = abs(df[elements].sum(axis = 1) - 1.0)
     if check2.max() >= 1.e-12:
-        error_handling.ProgramError("Unable to scale mass fractions.")
+        raise error_handling.ProgramError("Unable to scale mass fractions.")
 
+def check_mass_metallicity_consistent(df):
+    """
+    """
+    z_list = df.Z.unique()
+    m_list = df.mass.unique()
+
+    for m in m_list:
+        z_ = df[df.mass == m].Z.unique()
+        if set(z_) != set(z_list):
+            raise error_handling.NotImplementedError()

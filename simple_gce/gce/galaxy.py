@@ -19,6 +19,19 @@ class Galaxy(object):
         """
         # Load the stellar model yields (CC, AGB, etc.)
         self.stellar_models = load_stellar_models.read_stellar_csv()
+        # Include only the elements listed in the dataset.
+        self.elements = list(set(self.stellar_models.columns).intersection(set(el2z.keys())))
+        # Sort by charge number
+        self.elements.sort(key = lambda x : el2z[x])
+        arrays = load_stellar_models.fill_arrays(self.stellar_models)
+        self.mass_dim = arrays['mass_dim']
+        self.z_dim = arrays['z_dim']
+        self.x_idx = arrays['x_idx']
+        self.lifetime = arrays['lifetime']
+        self.mass_final = arrays['mass_final']
+        self.mass_remnant = arrays['mass_remnant']
+        self.x_cc = arrays['x_cc']
+        self.x_wind = arrays['x_wind'] 
         self.ia_model = load_stellar_models.read_ia_csv()
 
         # Initialise variables (from config where appropriate).
@@ -28,12 +41,8 @@ class Galaxy(object):
         self.star_mass = 0.0
         self.sfr = 0.0#config.GALAXY_PARAMS['sfr_init']
         self.infall_rate = self.calc_infall_rate(self.time)
-        # Include only the elements listed in the dataset.
-        self.elements = list(set(self.stellar_models.columns).intersection(set(el2z.keys())))
         # The elemental mass fractions in the gas to evolve.
         x = np.zeros(len(self.elements))
-        # Store the index for each element in the array.
-        self.x_idx = {el : int(i) for i,el in enumerate(self.elements)}
         x[self.x_idx['H']] = float(config.GALAXY_PARAMS['h_init'])
         x[self.x_idx['He']] = float(config.GALAXY_PARAMS['he_init'])
         self.x = x
@@ -43,7 +52,7 @@ class Galaxy(object):
         # other data will be output to file on disk. 
         self.historical_z = np.array([[self.time, self.z]])
         self.historical_sfr = np.array([[self.time, self.sfr]])
-        self.imf = generate_imf.IMF(stellar_models = self.stellar_models, slope = config.IMF_PARAMS['slope'])
+        self.imf = generate_imf.IMF(masses = self.mass_dim, slope = config.IMF_PARAMS['slope'])
 
 
     def evolve(self, dt):
@@ -53,7 +62,13 @@ class Galaxy(object):
         elements = self.elements
         time = self.time
 
-        stellar_models = self.stellar_models
+        mass_dim = self.mass_dim 
+        z_dim = self.z_dim 
+        lifetime = self.lifetime 
+        mass_final = self.mass_final 
+        mass_remnant = self.mass_remnant
+        x_cc = self.x_cc
+        x_wind = self.x_wind
 
         imf = self.imf
         historical_z = self.historical_z
@@ -67,25 +82,22 @@ class Galaxy(object):
         infall_rate = self.infall_rate
         infall_x = self.infall_x
 
-        # fill the composition of AGB/wind models if they have approximated.
+        # fill the composition of AGB/wind models if they have been approximated.
         # this will recycle the composition of the ISM from the time of formation.
-        if stellar_models[(stellar_models.type.isin(['agb','wind'])) & 
-                        (stellar_models.Z <= z)][elements].isna().any(axis = None):
-            stellar_models = approx_agb.fill_composition(stellar_models, z, x, x_idx)
-            self.stellar_models = stellar_models
+        if np.isnan(x_wind[:, z_dim <= z, :]).any():
+            x_wind[:, z_dim <= z, :] = approx_agb.fill_composition(x_wind[:, z_dim <= z, :], z, x, x_idx)
+            self.x_wind = x_wind
 
-        stellar_models = stellar_models[stellar_models.lifetime <= time].copy()
-
-        if stellar_models.empty:
+        if not (lifetime <= time).any() :
             ej_cc = 0.0
-            ej_cc_x = (self.stellar_models[elements] * 0.0).sum()
+            ej_x_cc = np.zeros_like(x_cc)
             ej_wind = 0.0
-            ej_wind_x = (self.stellar_models[elements] * 0.0).sum()
+            ej_x_wind = np.zeros_like(x_wind)
             #ej_ia = 0.0
             #ej_ia_x = (self.stellar_models[elements] * 0.0).sum()
         else:
             # time and metallicity at the point of formation for each stellar model
-            stellar_models.loc[:,'t_birth'] = time - np.array(stellar_models.lifetime)
+            t_birth = time - lifetime
             Z_birth = self._get_historical_value(historical_z,stellar_models.t_birth) 
             # extract the models with Z == Z_birth for each stellar mass
             models = self._filter_stellar_models(stellar_models,Z_birth)
@@ -130,7 +142,7 @@ class Galaxy(object):
         x = mx / self.gas_mass
         self.x = x
         if abs(np.sum(x) - 1.0) > 1.e-8:
-            error_handling.ProgramError("Error in evolution. SUM(X) != 1.0")
+            raise error_handling.ProgramError("Error in evolution. SUM(X) != 1.0")
         self.z = np.sum(x) - x[x_idx['H']] - x[x_idx['He']]
         self.time = time + dt
 

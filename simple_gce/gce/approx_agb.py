@@ -46,7 +46,7 @@ def fill_agb(stellar_models):
 
     return stellar_models
 
-def fill_composition(stellar_models, z, x, x_idx):
+def fill_composition(ej_x_wind, z, x, x_idx):
     """
     Set the composition of AGB/wind models where it is missing 
     as the composition of the ISM with same metallicity. 
@@ -56,8 +56,7 @@ def fill_composition(stellar_models, z, x, x_idx):
     f_conserve = 1.0 / np.sum(x)
 
     for el, idx in x_idx.items():
-        stellar_models.loc[stellar_models.type.isin(['agb','wind']) &
-                        (stellar_models.Z <= z) & 
-                        (stellar_models[el].isna()), el] = f_conserve * float(x[idx])
+        mask = np.where(np.isnan(ej_x_wind[:,:,idx]))
+        ej_x_wind[mask[0], mask[1], idx] = f_conserve * float(x[idx])
 
-    return stellar_models
+    return ej_x_wind
