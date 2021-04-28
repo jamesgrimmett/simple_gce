@@ -3,7 +3,7 @@
 import numpy as np
 
 from ..io import load_stellar_models
-from ..utils import chem_elements
+from ..utils import chem_elements, error_handling
 from . import generate_imf, approx_agb
 from .. import config
 
@@ -33,6 +33,16 @@ class Galaxy(object):
         self.x_cc = arrays['x_cc']
         self.x_wind = arrays['x_wind'] 
         self.ia_model = load_stellar_models.read_ia_csv()
+        if not set(self.ia_model.columns).issubset(set(self.elements)):
+            raise error_handling.NotImplementedError(
+                "Composition of Ia ejecta must\
+                     be a subset of the composition of stellar yields (CCSNe/winds)")
+        x_ia = np.zeros_like(self.elements)
+        for el, idx in self.x_idx.items():
+            if el in self.ia_model.columns:
+                x_ia[idx] = float(self.ia_model[el]) 
+        self.x_ia = x_ia
+        self.mass_co = float(config.STELLAR_MODELS['mass_co'])
 
         # Initialise variables (from config where appropriate).
         self.time = 0.0
@@ -69,6 +79,7 @@ class Galaxy(object):
         mass_remnant = self.mass_remnant
         x_cc = self.x_cc
         x_wind = self.x_wind
+        mass_co = self.mass_co
 
         imf = self.imf
         historical_z = self.historical_z
@@ -84,52 +95,63 @@ class Galaxy(object):
 
         # fill the composition of AGB/wind models if they have been approximated.
         # this will recycle the composition of the ISM from the time of formation.
-        if np.isnan(x_wind[:, z_dim <= z, :]).any():
-            x_wind[:, z_dim <= z, :] = approx_agb.fill_composition(x_wind[:, z_dim <= z, :], z, x, x_idx)
+        if np.isnan(x_wind[:,z_dim <= z]).any():
+            x_wind[:,z_dim <= z] = approx_agb.fill_composition(x_wind[:,z_dim <= z], z, x, x_idx)
             self.x_wind = x_wind
 
-        if not (lifetime <= time).any() :
+        # Trim arrays 
+        lifetime = lifetime[:,z_dim <= z]
+        mass_final = mass_final[:,z_dim <= z]
+        mass_remnant = mass_remnant[:,z_dim <= z]
+        x_cc = x_cc[:,z_dim <= z,:]
+        x_wind = x_wind[:,z_dim <= z,:]
+        z_dim = z_dim[z_dim <= z]
+
+        if not (lifetime <= time).any():
             ej_cc = 0.0
-            ej_x_cc = np.zeros_like(x_cc)
+            ej_x_cc = np.zeros_like(x)
             ej_wind = 0.0
-            ej_x_wind = np.zeros_like(x_wind)
-            #ej_ia = 0.0
-            #ej_ia_x = (self.stellar_models[elements] * 0.0).sum()
+            ej_x_wind = np.zeros_like(x)
+            ej_ia = 0.0
+            ej_ia_x = np.zeros_like(x)
         else:
             # time and metallicity at the point of formation for each stellar model
             t_birth = time - lifetime
-            Z_birth = self._get_historical_value(historical_z,stellar_models.t_birth) 
-            # extract the models with Z == Z_birth for each stellar mass
-            models = self._filter_stellar_models(stellar_models,Z_birth)
-            if not models.mass.is_unique:
+            z_birth = self._get_historical_value(historical_z, t_birth) 
+            # Create a mask for the models with Z == Z_birth for each stellar mass
+            mask = self._filter_stellar_models(z_birth, z_dim)
+            # Ensure only one model per mass is kept
+            if mask.sum(axis = 1).max() != 1:
                 raise error_handling.ProgramError("Unable to filter stellar models")
 
-            cc_models = models[(models.type == 'cc')].copy()
-            wind_models = models[models.type.isin(['agb','wind'])].copy()
+            x_cc = x_cc[mask]
+            x_wind = x_wind[mask]
+            mass_final = mass_final[mask]
+            mass_remnant = mass_remnant[mask]
+            mass_dim = mass_dim[mask.sum(axis = 1).astype(bool)]
 
-            cc_imfdm = imf.imfdm(mass_list = cc_models.mass)
-            wind_imfdm = imf.imfdm(mass_list = wind_models.mass)
+            imfdm = imf.imfdm(mass_list = mass_dim)
 
-            cc_sfr_birth = self._get_historical_value(historical_sfr,cc_models.t_birth) 
-            wind_sfr_birth = self._get_historical_value(historical_sfr,wind_models.t_birth) 
-            # ejecta mass from massive stars (core collapse/winds) for each mass range
-            ej_cc_ = (cc_models.mass_final - cc_models.remnant_mass) * cc_sfr_birth * cc_imfdm
+            sfr_birth = self._get_historical_value(historical_sfr,t_birth) 
+            sfr_birth = sfr_birth[mask]
+            # ejecta mass from stars (core collapse/winds) for each mass range
+            ej_cc_ = (mass_final - mass_remnant) * sfr_birth * imfdm
             # total ejecta mass from massive stars (core collapse/winds)
             ej_cc = ej_cc_.sum()
             # ejecta mass (per element) from massive stars (core collapse/winds)
-            ej_cc_x = cc_models[elements].mul(ej_cc_, axis = 'rows').sum()
+            ej_x_cc = np.matmul(ej_cc_, x_cc)
             # ejecta mass from winds for each mass range 
-            ej_wind_ = (wind_models.mass - wind_models.mass_final) * wind_sfr_birth * wind_imfdm
+            ej_wind_ = (mass_dim - mass_final) * sfr_birth * imfdm
             # total ejecta mass from winds
             ej_wind = ej_wind_.sum()
             # ejecta mass (per element) from winds
-            ej_wind_x = wind_models[elements].mul(ej_wind_, axis = 'rows').sum()
+            ej_x_wind = np.matmul(ej_wind_, x_wind)
 
             # Ia
             #rate_ia = ...
             #ej_ia = ia_models....
 
-        ej_x = np.array(ej_cc_x + ej_wind_x)
+        ej_x = np.array(ej_x_cc + ej_x_wind)
         ej = ej_cc + ej_wind
         
         dm_s_dt = sfr - ej
@@ -213,28 +235,44 @@ class Galaxy(object):
         Args:
             historical_array: 2D array of [time,value] evolution. Must be
                 orderder by time (ascending).
-            time_array: 1D array of time values for extraction from 
+            time_array: 2D array of time values for extraction from 
                 historical datapoints. 
         Returns:
             values: Values extracted from the historical array at the specified
                 times. Ordering matches the time_array provided.
         """
 
-        values = np.array([historical_array[historical_array[:,0] <= t][-1][-1] for t in time_array])
+        values = np.zeros_like(time_array)
+        for i in range(time_array.shape[0]):
+            for j in range(time_array.shape[1]):
+                vals = historical_array[historical_array[:,0] <= time_array[i,j]]
+                if len(vals) == 0:
+                    values[i,j] = np.nan
+                else:
+                    values[i,j] = vals[-1][-1]
             
         return values
     
-    def _filter_stellar_models(self,stellar_models,z_birth):
+    @staticmethod
+    def _filter_stellar_models(z_birth,z_dim):
         """
         Extract model with Z == Z_birth for each stellar mass.
         """
 
-        time = self.time
-        z = self.z
-        stellar_models.loc[:,'Z_diff'] = abs(stellar_models.Z - z_birth)
-        stellar_models = stellar_models[(stellar_models.lifetime <= time) & (stellar_models.Z <= z)]
-        idx = stellar_models.groupby('mass').Z_diff.idxmin().to_list()
-        stellar_models = stellar_models[stellar_models.index.isin(idx)] 
-        stellar_models.drop(columns = ['Z_diff'], inplace = True)
+        #time = self.time
+        #z = self.z
+        #stellar_models.loc[:,'Z_diff'] = abs(stellar_models.Z - z_birth)
+        #stellar_models = stellar_models[(stellar_models.lifetime <= time) & (stellar_models.Z <= z)]
+        #idx = stellar_models.groupby('mass').Z_diff.idxmin().to_list()
+        #stellar_models = stellar_models[stellar_models.index.isin(idx)] 
+        #stellar_models.drop(columns = ['Z_diff'], inplace = True)
+        
+        #z_diff = np.array([abs(row - z_dim) for row in z_birth])
+        #mask = np.array([row == row.min() for row in z_diff])
 
-        return stellar_models
+        mask = np.empty_like(z_birth)
+        for i,row in enumerate(z_birth):
+            z_diff = abs(row - z_dim)
+            mask[i] = z_diff == z_diff.min()
+
+        return mask.astype(bool)
