@@ -115,15 +115,15 @@ class Galaxy(object):
             ej_ia = 0.0
             ej_ia_x = np.zeros_like(x)
         else:
-            # time and metallicity at the point of formation for each stellar model
+            # Time and metallicity at the point of formation for each stellar model
             t_birth = time - lifetime
             z_birth = self._get_historical_value(historical_z, t_birth) 
             # Create a mask for the models with Z == Z_birth for each stellar mass
             mask = self._filter_stellar_models(z_birth, z_dim)
-            # Ensure only one model per mass is kept
+            # Ensure only one model (metallicity) per mass is kept
             if mask.sum(axis = 1).max() != 1:
                 raise error_handling.ProgramError("Unable to filter stellar models")
-
+            # Filter the model arrays to include only those shedding mass
             x_cc = x_cc[mask]
             x_wind = x_wind[mask]
             mass_final = mass_final[mask]
@@ -135,18 +135,17 @@ class Galaxy(object):
             sfr_birth = self._get_historical_value(historical_sfr,t_birth) 
             sfr_birth = sfr_birth[mask]
             # ejecta mass from stars (core collapse/winds) for each mass range
-            ej_cc_ = (mass_final - mass_remnant) * sfr_birth * imfdm
+            ej_cc_ = (mass_final - mass_remnant) / mass_dim * sfr_birth * imfdm
             # total ejecta mass from massive stars (core collapse/winds)
             ej_cc = ej_cc_.sum()
             # ejecta mass (per element) from massive stars (core collapse/winds)
             ej_x_cc = np.matmul(ej_cc_, x_cc)
             # ejecta mass from winds for each mass range 
-            ej_wind_ = (mass_dim - mass_final) * sfr_birth * imfdm
+            ej_wind_ = (mass_dim - mass_final) / mass_dim * sfr_birth * imfdm
             # total ejecta mass from winds
             ej_wind = ej_wind_.sum()
             # ejecta mass (per element) from winds
             ej_x_wind = np.matmul(ej_wind_, x_wind)
-
             # Ia
             #rate_ia = ...
             #ej_ia = ia_models....

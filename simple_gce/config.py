@@ -14,7 +14,7 @@ FILEPATHS = {
 IMF_PARAMS = {
     'mass_min' : 0.05,  # solar masses, minimum stellar mass.
     'mass_max' : 100.0, # solar masses, maximum stellar mass.
-    'slope'    : 2.35#1.35?,  # exponent of the IMF (phi(m) ~ m**-slope).
+    'slope'    : 2.35,  # exponent of the IMF (phi(m) ~ m**-slope).
 }
 
 STELLAR_MODELS = {
