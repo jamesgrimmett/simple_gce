@@ -1,13 +1,15 @@
 """Galaxy class object."""
 
 import numpy as np
+from scipy import interpolate
 
 from ..io import load_stellar_models
 from ..utils import chem_elements, error_handling
-from . import generate_imf, approx_agb
+from . import imf, approx_agb, approx_lifetime
 from .. import config
 
 el2z = chem_elements.el2z 
+lt = approx_lifetime.ApproxLifetime()
 
 INFALL_TIMESCALE = config.GALAXY_PARAMS['infall_timescale']
 SFR_TIMESCALE = config.GALAXY_PARAMS['sfr_timescale']
@@ -157,11 +159,17 @@ class Galaxy(object):
             mass_final = mass_final[mask]
             mass_remnant = mass_remnant[mask]
             mass_dim = mass_dim[mask.sum(axis = 1).astype(bool)]
+            lifetime = lifetime[mask]
+            t_birth = t_birth[mask]
+            z_birth = z_birth[mask]
+            if (lifetime > time).any():
+                #arrays need more trimming
+                xxx
 
             imfdm = imf.imfdm(mass_list = mass_dim)
 
             sfr_birth = self._get_historical_value(historical_sfr,t_birth) 
-            sfr_birth = sfr_birth[mask]
+            
             # ejecta mass from stars (core collapse/winds) for each mass range
             ej_cc_ = (mass_final - mass_remnant) / mass_dim * sfr_birth * imfdm
             # total ejecta mass from massive stars (core collapse/winds)
@@ -287,14 +295,9 @@ class Galaxy(object):
                 times. Ordering matches the time_array provided.
         """
 
-        values = np.zeros_like(time_array)
-        for i in range(time_array.shape[0]):
-            for j in range(time_array.shape[1]):
-                vals = historical_array[historical_array[:,0] <= time_array[i,j]]
-                if len(vals) == 0:
-                    values[i,j] = np.nan
-                else:
-                    values[i,j] = vals[-1][-1]
+        f = interpolate.interp1d(historical_array[:,0], historical_array[:,1], 
+                                        bounds_error = False, fill_value = np.nan)
+        values = f(time_array)
             
         return values
     
