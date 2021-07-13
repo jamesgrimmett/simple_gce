@@ -32,17 +32,6 @@ class Galaxy(object):
         self.mass_remnant = arrays['mass_remnant']
         self.x_cc = arrays['x_cc']
         self.x_wind = arrays['x_wind'] 
-        self.ia_model = load_stellar_models.read_ia_csv()
-        if not set(self.ia_model.columns).issubset(set(self.elements)):
-            raise error_handling.NotImplementedError(
-                "Composition of Ia ejecta must\
-                     be a subset of the composition of stellar yields (CCSNe/winds)")
-        x_ia = np.zeros_like(self.elements)
-        for el, idx in self.x_idx.items():
-            if el in self.ia_model.columns:
-                x_ia[idx] = float(self.ia_model[el]) 
-        self.x_ia = x_ia
-        self.mass_co = float(config.STELLAR_MODELS['mass_co'])
 
         # Initialise variables (from config where appropriate).
         self.time = 0.0
@@ -62,7 +51,46 @@ class Galaxy(object):
         # other data will be output to file on disk. 
         self.historical_z = np.array([[self.time, self.z]])
         self.historical_sfr = np.array([[self.time, self.sfr]])
-        self.imf = generate_imf.IMF(masses = self.mass_dim, slope = config.IMF_PARAMS['slope'])
+        self.imf = imf.IMF(masses = self.mass_dim, 
+                                    slope = config.IMF_PARAMS['slope'],
+                                    mass_min = config.IMF_PARAMS['mass_min'],
+                                    mass_max = config.IMF_PARAMS['mass_max'],
+                                    mass_min_cc = config.STELLAR_MODELS['mass_min_cc']
+                                    )
+        # Initialise the Ia model parameters
+        self.ia_model = load_stellar_models.read_ia_csv()
+        if not set(self.ia_model.columns).issubset(set(self.elements)):
+            raise error_handling.NotImplementedError(
+                "Composition of Ia ejecta must\
+                     be a subset of the composition of stellar yields (CCSNe/winds)")
+        x_ia = np.zeros_like(self.elements)
+        for el, idx in self.x_idx.items():
+            if el in self.ia_model.columns:
+                x_ia[idx] = float(self.ia_model[el]) 
+        self.x_ia = x_ia
+        self.mass_co = float(config.IA_PARAMS['mass_co'])
+        self.imf_donor_slope = float(config.IA_PARAMS['imf_donor_slope'])
+        self.mdl_rg = float(config.IA_PARAMS['mdl_rg'])
+        self.mdu_rg = float(config.IA_PARAMS['mdu_rg'])
+        self.mdl_ms = float(config.IA_PARAMS['mdl_ms'])
+        self.mdu_ms = float(config.IA_PARAMS['mdu_ms'])
+        self.mpl = float(config.IA_PARAMS['mpl'])
+        self.mpu = float(config.IA_PARAMS['mpu'])
+        self.b_rg = float(config.IA_PARAMS['b_rg'])
+        self.b_ms = float(config.IA_PARAMS['b_ms'])
+
+        #self.masses_rg = np.arange(self.mdl_rg, self.mdu_rg, 0.1)
+        #self.imf_ia_rg = imf.IMF(masses = self.masses_rg, 
+        #                            slope = self.imf_donor_slope,
+        #                            mass_min = self.mdl_rg,
+        #                            mass_max = self.mdu_rg,
+        #                            )
+        #self.masses_ms = np.arange(self.mdl_ms, self.mdu_ms, 0.1), 
+        #self.imf_ia_ms = imf.IMF(masses = self.masses_ms,
+        #                            slope = self.imf_donor_slope,
+        #                            mass_min = self.mdl_ms,
+        #                            mass_max = self.mdu_ms,
+        #                            )
 
 
     def evolve(self, dt):
@@ -205,7 +233,25 @@ class Galaxy(object):
         sfr = 1.0 / SFR_TIMESCALE * gas_mass
 
         return sfr
-        
+    
+    def calc_ia_rate(self):
+        """
+        """
+
+        # approximate the turnoff mass using the current metallicity
+        m_turnoff = lt.mass(lifetime = self.time, z = self.z) 
+        # WD - RG scenario
+        mdl_rg = max(self.mdl_rg, m_turnoff)
+        mdu_rg = self.mdu_rg
+        mpl = max(self.mpl, m_turnoff)
+        mpu = self.mpu
+        b_rg = self.b_rg
+        m_ms = self.b_ms
+        if (mdl_rg >= mdu_rg) or (mpl >= mpu):
+            rate_rg = 0.0
+        else:
+            rate_rg_ = b_rg * self.imf.integrate_ia(lower = mpl, upper = mpu)
+            
     def update_historical_sfr(self):#,t_min):
         """
         """

@@ -17,9 +17,22 @@ IMF_PARAMS = {
     'slope'    : 2.35,  # exponent of the IMF (phi(m) ~ m**-slope).
 }
 
+# Parameters for the Ia system, outlined in Kobayashi 2006 Section 2.1
+IA_PARAMS = {
+    'imf_donor_slope' : 0.35, # exponent of the IMF (phi_d(m) ~ m**-slope).
+    'mass_co'   : 1.38, # solar masses, CO white dwarf mass for SNeIa.
+    'mdl_rg'    : 0.9,  # lower limit of the red giant scenario
+    'mdu_rg'    : 1.5,  # upper limit of the red giant scenario
+    'mdl_ms'    : 1.8,  # lower limit of the main-sequence scenario
+    'mdu_ms'    : 2.6,  # upper limit of the main-sequence scenario
+    'mpl'       : 3.0,   # lower limit of WD progenitor 
+    'mpu'       : 8.0,   # upper limit of WD progenitor 
+    'b_rg'      : 0.4,  # fraction of primary stars that produce Ia
+    'b_ms'      : 0.4,  # fraction of primary stars that produce Ia
+}
+
 STELLAR_MODELS = {
     'mass_min_cc' : 10, # solar masses, minimum stellar mass for CCSNe.
-    'mass_co' : 1.38,   # solar masses, CO white dwarf mass for SNeIa.
 }
 
 GALAXY_PARAMS = {
