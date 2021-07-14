@@ -7,9 +7,13 @@ from ..utils import error_handling
 class IMF(object):
     """
     """
-    def __init__(self, masses, slope, mass_min, mass_max, mass_min_cc = None):
-        self.mass_min = config.IMF_PARAMS['mass_min']
-        self.mass_max = config.IMF_PARAMS['mass_max']
+    def __init__(self, masses, slope, mass_min = None, mass_max = None, mass_min_cc = None):
+        if mass_min == None:
+            mass_min = config.IMF_PARAMS['mass_min']
+        if mass_max == None:
+            mass_max = config.IMF_PARAMS['mass_max']
+        self.mass_min = mass_min
+        self.mass_max = mass_max
         self.mass_min_cc = config.STELLAR_MODELS['mass_min_cc']
         self.slope = slope
         # normalising total mass to 1.0
@@ -67,13 +71,18 @@ class IMF(object):
         mass_min_cc = self.mass_min_cc 
 
         lo_mass_models = masses[(masses >= mass_min) & (masses < mass_min_cc)]
-        hi_mass_models = masses[(masses >= mass_min_cc) & (masses <= mass_max)]
         lo_mass_bins = [(lo_mass_models[i+1] + m)/2 for i,m in enumerate(lo_mass_models[:-1])]        
         lo_mass_bins.insert(0,mass_min)        
-        lo_mass_bins.append(mass_min_cc)        
-        hi_mass_bins = [(hi_mass_models[i+1] + m)/2 for i,m in enumerate(hi_mass_models[:-1])]        
-        hi_mass_bins.append(mass_max)
-        mass_bins = np.concatenate((np.array(lo_mass_bins), np.array(hi_mass_bins)))        
+        if (masses > mass_min_cc).any():
+            lo_mass_bins.append(mass_min_cc)        
+            hi_mass_models = masses[(masses >= mass_min_cc) & (masses <= mass_max)]
+            hi_mass_bins = [(hi_mass_models[i+1] + m)/2 for i,m in enumerate(hi_mass_models[:-1])]        
+            hi_mass_bins.append(mass_max)
+            mass_bins = np.concatenate((np.array(lo_mass_bins), np.array(hi_mass_bins)))        
+        else:
+            lo_mass_bins.append(mass_max)        
+            mass_bins = np.array(lo_mass_bins)
+
         mass_bins = np.transpose([mass_bins[:-1],mass_bins[1:]])
 
         return mass_bins

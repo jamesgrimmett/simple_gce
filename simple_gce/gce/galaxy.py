@@ -81,18 +81,18 @@ class Galaxy(object):
         self.b_rg = float(config.IA_PARAMS['b_rg'])
         self.b_ms = float(config.IA_PARAMS['b_ms'])
 
-        #self.masses_rg = np.arange(self.mdl_rg, self.mdu_rg, 0.1)
-        #self.imf_ia_rg = imf.IMF(masses = self.masses_rg, 
-        #                            slope = self.imf_donor_slope,
-        #                            mass_min = self.mdl_rg,
-        #                            mass_max = self.mdu_rg,
-        #                            )
-        #self.masses_ms = np.arange(self.mdl_ms, self.mdu_ms, 0.1), 
-        #self.imf_ia_ms = imf.IMF(masses = self.masses_ms,
-        #                            slope = self.imf_donor_slope,
-        #                            mass_min = self.mdl_ms,
-        #                            mass_max = self.mdu_ms,
-        #                            )
+        self.masses_rg = np.arange(self.mdl_rg, self.mdu_rg, 0.1)
+        self.imf_ia_rg = imf.IMF(masses = self.masses_rg, 
+                                    slope = self.imf_donor_slope,
+                                    mass_min = self.mdl_rg,
+                                    mass_max = self.mdu_rg,
+                                    )
+        self.masses_ms = np.arange(self.mdl_ms, self.mdu_ms, 0.1) 
+        self.imf_ia_ms = imf.IMF(masses = self.masses_ms,
+                                    slope = self.imf_donor_slope,
+                                    mass_min = self.mdl_ms,
+                                    mass_max = self.mdu_ms,
+                                    )
 
 
     def evolve(self, dt):
