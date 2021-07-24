@@ -40,6 +40,7 @@ class Galaxy(object):
         self.z = 0.0
         self.gas_mass = 0.0
         self.star_mass = 0.0
+        self.galaxy_mass = 0.0
         self.sfr = 0.0#config.GALAXY_PARAMS['sfr_init']
         self.infall_rate = self.calc_infall_rate(self.time)
         # The elemental mass fractions in the gas to evolve.
@@ -193,16 +194,16 @@ class Galaxy(object):
         dm_g_dt = infall_rate - sfr + ej
         dm_mx_dt = (infall_x * infall_rate) - (x * sfr) + ej_x 
 
+        self.galaxy_mass += infall_rate * dt
         self.star_mass = star_mass + dm_s_dt * dt
         self.gas_mass = gas_mass + dm_g_dt * dt
         mx = x * gas_mass + dm_mx_dt * dt
         x = mx / self.gas_mass
         self.x = x
-        if abs(np.sum(x) - 1.0) > 1.e-8:
-            raise error_handling.ProgramError("Error in evolution. SUM(X) != 1.0")
         self.z = np.sum(x) - x[x_idx['H']] - x[x_idx['He']]
         self.time = time + dt
 
+        self._conservation_checks()
         self.update_sfr()
         self.update_infall_rate()
         self.update_historical_sfr()
@@ -324,3 +325,13 @@ class Galaxy(object):
             mask[i] = z_diff == z_diff.min()
 
         return mask.astype(bool)
+
+    def _conservation_checks(self):
+        """
+        """
+        if abs(np.sum(self.x) - 1.0) > 1.e-8:
+            raise error_handling.ProgramError("Error in evolution. SUM(X) != 1.0")
+        if abs(self.star_mass + self.gas_mass - self.galaxy_mass) > 1.e-8:
+            raise error_handling.ProgramError("Error in evolution. Total mass not conserved")
+        if (self.galaxy_mass > TOTAL_MASS):
+            raise error_handling.ProgramError("Error in evolution. Galaxy mass exceeds mass available in system")
