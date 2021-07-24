@@ -331,7 +331,7 @@ class Galaxy(object):
         """
         if abs(np.sum(self.x) - 1.0) > 1.e-8:
             raise error_handling.ProgramError("Error in evolution. SUM(X) != 1.0")
-        if abs(self.star_mass + self.gas_mass - self.galaxy_mass) > 1.e-8:
+        if abs( ( (self.star_mass + self.gas_mass) / self.galaxy_mass ) - 1.0) > 1.e-8:
             raise error_handling.ProgramError("Error in evolution. Total mass not conserved")
         if (self.galaxy_mass > TOTAL_MASS):
             raise error_handling.ProgramError("Error in evolution. Galaxy mass exceeds mass available in system")
