@@ -39,6 +39,8 @@ GALAXY_PARAMS = {
     'total_mass' : 1.e12,       # solar masses, total baryonic mass available to form a galaxy.
     'infall_timescale' : 5.e9,  # years. Kobayashi (2006) have 5.e9.
     'sfr_timescale' : 2.2e9,    # years. Kobayashi (2006) have 2.2e9.
+    'sfr_init' : 0.0,           # solar masses per year.
+    'z_init' : 0.0,             # metallicity
     'h_init' : 0.7513,          # mass fraction, hydrogen initial.
     'he_init' : 0.2487,         # mass fraction, helium initial.
 }

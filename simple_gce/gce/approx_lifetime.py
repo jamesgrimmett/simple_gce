@@ -15,6 +15,11 @@ class ApproxLifetime(object):
         f_lifetime = self.interpolate_lifetimes(lifetime_data)
         self.f_lifetime = f_lifetime
 
+        # Setup arrays for fast mass approximation
+        self.mass_arr = np.array([m for m in np.arange(0.01,100,0.1)])
+        self.lifetime_arr = np.array([self.lifetime(m,0.0) for m in self.mass_arr])
+    
+
     def interpolate_lifetimes(self,data):
         """
         SHOULD INTERPOLATE IN LOGSPACE?
@@ -44,21 +49,19 @@ class ApproxLifetime(object):
         f = interpolate.interp2d(x,y,np.transpose(z))
         return f
     
-    
     def lifetime(self,mass,z):
         """
         Returns the lifetime for a star of given mass and metallicity
         
         Args:
-            f_lifetime: The interpolation function for lifetimes.
-            m: The stars mass.
+            mass: The stars mass.
             z: The stars metallicity.
         Returns:
             Stellar lifetime in years.
         """
         f_lifetime = self.f_lifetime
     
-        t = float(f_lifetime(mass,z))
+        t = f_lifetime(mass,z)
     
         return t
     
@@ -76,6 +79,23 @@ class ApproxLifetime(object):
         m_arr = np.array([m for m in np.arange(0.01,100,0.1)])
         arr = np.array([self.lifetime(m,z) for m in m_arr])
     
+        m = m_arr[abs(arr - lifetime).argmin()]
+    
+        return m
+
+    def mass_approx(self,lifetime):
+        """
+        Returns an approximate stellar mass for a given lifetime, assuming Z = 0.
+        Faster and less accurate than self.mass()
+        
+        Args:
+            t: Stellar lifetime.
+        Returns:
+            The stellar mass in solar masses.
+        """
+
+        arr = self.lifetime_arr
+        m_arr = self.mass_arr
         m = m_arr[abs(arr - lifetime).argmin()]
     
         return m

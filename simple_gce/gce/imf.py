@@ -1,13 +1,14 @@
 """The initial mass function."""
 
 import numpy as np
+from scipy.integrate import quad as quad_int
 from .. import config
 from ..utils import error_handling
 
 class IMF(object):
     """
     """
-    def __init__(self, masses, slope, mass_min = None, mass_max = None, mass_min_cc = None):
+    def __init__(self, form, slope, masses = None, mass_min = None, mass_max = None, mass_min_cc = None):
         if mass_min == None:
             mass_min = config.IMF_PARAMS['mass_min']
         if mass_max == None:
@@ -15,13 +16,30 @@ class IMF(object):
         self.mass_min = mass_min
         self.mass_max = mass_max
         self.mass_min_cc = config.STELLAR_MODELS['mass_min_cc']
-        self.slope = slope
+        self.slope = abs(slope) # minus sign is coded explicitly throughout the class 
+        self.form = form
         # normalising total mass to 1.0
         self.imf_norm = (1.0 - self.slope) / (self.mass_max**(1.0 - self.slope) - self.mass_min**(1.0 - self.slope))
-        self.masses = masses
-        self.mass_bins = self._generate_mass_bins()
-        self.dms = self.mass_bins[:,1] - self.mass_bins[:,0]
+        # TODO: consider separate discrete_IMF and continuous_IMF classes for simplicity.
+        if (form == 'discrete'):
+            if (masses is None):
+                raise error_handling.ProgramError(f"You must pass a list of masses for a discrete IMF")
+            else:
+                self.masses = masses
+                self.mass_bins = self._generate_mass_bins()
+                self.dms = self.mass_bins[:,1] - self.mass_bins[:,0]
+        elif (form == 'continuous'):
+            # Placeholder in case we need to do something here
+            pass
+        else:
+            raise error_handling.ProgramError(f"Can only process form = continuous or discrete")
+
         self._test_imf()
+
+    def functional_form(self, m):
+        result = self.imf_norm * m ** (-1.0 * self.slope)
+
+        return result
 
     def imfdm(self,mass_list):
         """
@@ -90,7 +108,10 @@ class IMF(object):
     def _test_imf(self):
         """
         """
-        check = np.sum(self.imfdm(mass_list = self.masses)) - 1.0
+        if self.form == 'discrete':
+            check = 1.0 - np.sum(self.imfdm(mass_list = self.masses))
+        else:
+            check = 1.0 - quad_int(self.functional_form, self.mass_min, self.mass_max)
         if abs(check) >= 1.e-5:
             raise error_handling.ProgramError("Error in the IMF implementation. Does not sum to unity.")
 

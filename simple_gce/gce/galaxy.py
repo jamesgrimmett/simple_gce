@@ -2,6 +2,8 @@
 
 import numpy as np
 from scipy import interpolate
+from scipy.integrate import quad as quad_int
+from scipy.integrate import fixed_quad as f_quad_int
 
 from ..io import load_stellar_models
 from ..utils import chem_elements, error_handling
@@ -37,11 +39,11 @@ class Galaxy(object):
 
         # Initialise variables (from config where appropriate).
         self.time = 0.0
-        self.z = 0.0
+        self.z = config.GALAXY_PARAMS['z_init']
         self.gas_mass = 0.0
         self.star_mass = 0.0
         self.galaxy_mass = 0.0
-        self.sfr = 0.0#config.GALAXY_PARAMS['sfr_init']
+        self.sfr = config.GALAXY_PARAMS['sfr_init']
         self.infall_rate = self.calc_infall_rate(self.time)
         # The elemental mass fractions in the gas to evolve.
         x = np.zeros(len(self.elements))
@@ -55,6 +57,7 @@ class Galaxy(object):
         self.historical_z = np.array([[self.time, self.z]])
         self.historical_sfr = np.array([[self.time, self.sfr]])
         self.imf = imf.IMF(masses = self.mass_dim, 
+                                    form = 'discrete',
                                     slope = config.IMF_PARAMS['slope'],
                                     mass_min = config.IMF_PARAMS['mass_min'],
                                     mass_max = config.IMF_PARAMS['mass_max'],
@@ -66,7 +69,7 @@ class Galaxy(object):
             raise error_handling.NotImplementedError(
                 "Composition of Ia ejecta must\
                      be a subset of the composition of stellar yields (CCSNe/winds)")
-        x_ia = np.zeros_like(self.elements)
+        x_ia = np.zeros(len(self.elements))
         for el, idx in self.x_idx.items():
             if el in self.ia_model.columns:
                 x_ia[idx] = float(self.ia_model[el]) 
@@ -84,16 +87,21 @@ class Galaxy(object):
 
         self.masses_rg = np.arange(self.mdl_rg, self.mdu_rg, 0.1)
         self.imf_ia_rg = imf.IMF(masses = self.masses_rg, 
+                                    form = 'discrete',
                                     slope = self.imf_donor_slope,
                                     mass_min = self.mdl_rg,
                                     mass_max = self.mdu_rg,
                                     )
         self.masses_ms = np.arange(self.mdl_ms, self.mdu_ms, 0.1) 
         self.imf_ia_ms = imf.IMF(masses = self.masses_ms,
+                                    form = 'discrete',
                                     slope = self.imf_donor_slope,
                                     mass_min = self.mdl_ms,
                                     mass_max = self.mdu_ms,
                                     )
+
+        self.f_sfr = lambda _: config.GALAXY_PARAMS['sfr_init']
+        self.f_z = lambda _: config.GALAXY_PARAMS['z_init']
 
 
     def evolve(self, dt):
@@ -111,6 +119,7 @@ class Galaxy(object):
         x_cc = self.x_cc
         x_wind = self.x_wind
         mass_co = self.mass_co
+        x_ia = self.x_ia
 
         imf = self.imf
         historical_z = self.historical_z
@@ -144,11 +153,11 @@ class Galaxy(object):
             ej_wind = 0.0
             ej_x_wind = np.zeros_like(x)
             ej_ia = 0.0
-            ej_ia_x = np.zeros_like(x)
+            ej_x_ia = np.zeros_like(x)
         else:
             # Time and metallicity at the point of formation for each stellar model
             t_birth = time - lifetime
-            z_birth = self._get_historical_value(historical_z, t_birth) 
+            z_birth = self._get_historical_value('z', t_birth) 
             # Create a mask for the models with Z == Z_birth for each stellar mass
             mask = self._filter_stellar_models(z_birth, z_dim)
             # Ensure only one model (metallicity) per mass is kept
@@ -164,12 +173,12 @@ class Galaxy(object):
             t_birth = t_birth[mask]
             z_birth = z_birth[mask]
             if (lifetime > time).any():
-                #arrays need more trimming
-                xxx
+                # TODO: add checks for correctness of stellar models
+                raise error_handling.ProgramError("Error in evolution. Stellar models are incorrect")
 
             imfdm = imf.imfdm(mass_list = mass_dim)
 
-            sfr_birth = self._get_historical_value(historical_sfr,t_birth) 
+            sfr_birth = self._get_historical_value('sfr',t_birth) 
             
             # ejecta mass from stars (core collapse/winds) for each mass range
             ej_cc_ = (mass_final - mass_remnant) / mass_dim * sfr_birth * imfdm
@@ -184,11 +193,12 @@ class Galaxy(object):
             # ejecta mass (per element) from winds
             ej_x_wind = np.matmul(ej_wind_, x_wind)
             # Ia
-            #rate_ia = ...
-            #ej_ia = ia_models....
+            rate_ia = self.calc_ia_rate_fast()
+            ej_ia = mass_co * rate_ia
+            ej_x_ia = ej_ia * x_ia
 
-        ej_x = np.array(ej_x_cc + ej_x_wind)
-        ej = ej_cc + ej_wind
+        ej_x = np.array(ej_x_cc + ej_x_wind + ej_x_ia)
+        ej = ej_cc + ej_wind + ej_ia
         
         dm_s_dt = sfr - ej
         dm_g_dt = infall_rate - sfr + ej
@@ -243,23 +253,73 @@ class Galaxy(object):
 
         return sfr
     
-    def calc_ia_rate(self):
+    def calc_ia_rate_fast(self):
         """
+        ...
+        Accuracy is exchanged for speed in this function (fixed_quad and lt.mass_approx).
+        Should make calc_ia_rate_slow() and compare results every n timesteps 
         """
 
         # approximate the turnoff mass using the current metallicity
-        m_turnoff = lt.mass(lifetime = self.time, z = self.z) 
+        m_turnoff = lt.mass_approx(lifetime = self.time) 
+        # Progenitor (WD) component
+        mpl = max(self.mpl, m_turnoff)
+        mpu = self.mpu
+        if (mpl >= mpu):
+            rate_ia = 0.0
+            return rate_ia
+
+        progenitor_component = self.imf.integrate_ia(lower = mpl, upper = mpu) 
+
         # WD - RG scenario
         mdl_rg = max(self.mdl_rg, m_turnoff)
         mdu_rg = self.mdu_rg
-        mpl = max(self.mpl, m_turnoff)
-        mpu = self.mpu
         b_rg = self.b_rg
-        m_ms = self.b_ms
-        if (mdl_rg >= mdu_rg) or (mpl >= mpu):
+        if (mdl_rg >= mdu_rg):
             rate_rg = 0.0
         else:
-            rate_rg_ = b_rg * self.imf.integrate_ia(lower = mpl, upper = mpu)
+            rate_rg_1 = b_rg * progenitor_component
+            rate_rg_2 = f_quad_int(lambda x: self._ia_donor_integrand(x, type = 'rg'), a = mdl_rg, b = mdu_rg)[0]
+            rate_rg = rate_rg_1 * rate_rg_2
+
+        # WD - MS scenario
+        b_ms = self.b_ms
+        mdl_ms = max(self.mdl_ms, m_turnoff)
+        mdu_ms = self.mdu_ms
+        if (mdl_ms >= mdu_ms) or (mpl >= mpu):
+            rate_ms = 0.0
+        else:
+            rate_ms_1 = b_ms * progenitor_component
+            rate_ms_2 = f_quad_int(lambda x: self._ia_donor_integrand(x, type = 'ms'), a = mdl_ms, b = mdu_ms)[0]
+            rate_ms = rate_ms_1 * rate_ms_2
+
+        rate_ia = rate_rg + rate_ms 
+
+        if np.isnan(rate_ia):
+            xxxx
+
+        return rate_ia
+
+    def _ia_donor_integrand(self, m, type):
+        """
+        """
+        if type == 'rg':
+            imf_m = self.imf_ia_rg.functional_form(m)
+        elif type == 'ms':
+            imf_m = self.imf_ia_ms.functional_form(m)
+        lifetime_m = lt.lifetime(mass = m, z = self.z)
+        t = self.time - lifetime_m
+        # TODO: sometimes slight difference between integration lower limit and 
+        #       true turnoff mass. Need to investigate. 
+        t = t.clip(min=0.0)
+        sfr_m = self._get_historical_value('sfr', t)
+
+        integrand = 1.0 / m * sfr_m * imf_m
+        if np.isnan(integrand).any():
+            xxx
+
+        return integrand
+
             
     def update_historical_sfr(self):#,t_min):
         """
@@ -270,6 +330,8 @@ class Galaxy(object):
         #historical_sfr = historical_sfr[historical_sfr[:,0] >= t_min]
         historical_sfr = np.append(historical_sfr, [[t,sfr]], axis = 0)
         self.historical_sfr = historical_sfr
+        self.f_sfr = interpolate.interp1d(historical_sfr[:,0], historical_sfr[:,1], 
+                                        bounds_error = False, fill_value = np.nan)
 
     def update_historical_z(self):#,t_min):
         """
@@ -280,9 +342,10 @@ class Galaxy(object):
         #historical_z = historical_z[historical_z[:,0] >= t_min]
         historical_z = np.append(historical_z, [[t,z]], axis = 0)
         self.historical_z = historical_z
+        self.f_z = interpolate.interp1d(historical_z[:,0], historical_z[:,1], 
+                                        bounds_error = False, fill_value = np.nan)
 
-    @staticmethod
-    def _get_historical_value(historical_array,time_array):
+    def _get_historical_value(self, property, time_array):
         """
         Search array of historical values for values at specified time(s).
 
@@ -296,8 +359,11 @@ class Galaxy(object):
                 times. Ordering matches the time_array provided.
         """
 
-        f = interpolate.interp1d(historical_array[:,0], historical_array[:,1], 
-                                        bounds_error = False, fill_value = np.nan)
+        if property == 'sfr':
+            f = self.f_sfr
+        elif property == 'z':
+            f = self.f_z
+
         values = f(time_array)
             
         return values
@@ -335,3 +401,5 @@ class Galaxy(object):
             raise error_handling.ProgramError("Error in evolution. Total mass not conserved")
         if (self.galaxy_mass > TOTAL_MASS):
             raise error_handling.ProgramError("Error in evolution. Galaxy mass exceeds mass available in system")
+        if np.isnan([self.galaxy_mass, self.star_mass, self.galaxy_mass]).any():
+            raise error_handling.ProgramError("Nan in evolution")
