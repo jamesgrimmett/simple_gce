@@ -28,7 +28,7 @@ def test_recover_portinari_mass():
             interp_val = float(lt.mass(lifetime=l, z=z))
             actual_val = float(row['M'])
 
-            assert np.round(interp_val,1) == actual_val
+            assert np.round(interp_val,1)  == actual_val
 
 TEST_INPUTS = [
     (0.0, 0.0),
