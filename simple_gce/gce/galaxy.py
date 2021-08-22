@@ -18,9 +18,9 @@ SFR_TIMESCALE = config.GALAXY_PARAMS['sfr_timescale']
 TOTAL_MASS = config.GALAXY_PARAMS['total_mass']
 
 class Galaxy(object):
+    """
+    """
     def __init__(self):
-        """
-        """
         # Load the stellar model yields (CC, AGB, etc.)
         self.stellar_models = load_stellar_models.read_stellar_csv()
         # Include only the elements listed in the dataset.
@@ -260,7 +260,7 @@ class Galaxy(object):
         Should make calc_ia_rate_slow() and compare results every n timesteps 
         """
 
-        # approximate the turnoff mass using the current metallicity
+        # approximate the turnoff mass
         m_turnoff = lt.mass_approx(lifetime = self.time) 
         # Progenitor (WD) component
         mpl = max(self.mpl, m_turnoff)
