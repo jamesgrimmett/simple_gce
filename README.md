@@ -1,6 +1,6 @@
 # simple_gce
 
-### Currently non-functional. The code was originally written to solve a model a very specific system, I am in the process of re-structuring this code so that it can be applied more generally.
+### Currently non-functional. The code was originally written to model a very specific system, I am in the process of re-structuring this code so that it can be applied more generally.
 
 A simple one-zone Galactic Chemical Evolution model, as used in [Grimmett et al. (2020)](https://arxiv.org/abs/1911.05901). 
 
