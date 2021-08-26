@@ -39,7 +39,7 @@ def fill_agb(stellar_models):
             models_agb.loc[i,'remnant_mass'] = 1.5
             models_agb.loc[i,'mass_final'] = 1.5
 
-        models_agb = approx_lifetime.fill_lifetimes(models_agb)
+    models_agb = approx_lifetime.fill_lifetimes(models_agb)
 
     models_agb[elements] = np.nan
     stellar_models = pd.concat((models_agb, stellar_models), ignore_index = True)
