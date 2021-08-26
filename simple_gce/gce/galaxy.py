@@ -21,12 +21,14 @@ class Galaxy(object):
     """
     """
     def __init__(self):
+        self.include_hn = bool(config.STELLAR_MODELS['include_hn'])
         # Load the stellar model yields (CC, AGB, etc.)
         self.stellar_models = load_stellar_models.read_stellar_csv()
         # Include only the elements listed in the dataset.
         self.elements = list(set(self.stellar_models.columns).intersection(set(el2z.keys())))
         # Sort by charge number
         self.elements.sort(key = lambda x : el2z[x])
+        # Load stellar model arrays
         arrays = load_stellar_models.fill_arrays(self.stellar_models)
         self.mass_dim = arrays['mass_dim']
         self.z_dim = arrays['z_dim']
@@ -36,6 +38,9 @@ class Galaxy(object):
         self.mass_remnant = arrays['mass_remnant']
         self.x_cc = arrays['x_cc']
         self.x_wind = arrays['x_wind'] 
+        if self.include_hn:
+            self.x_hn = arrays['x_hn']
+            self.x_hn_wind = arrays['x_hn_wind'] 
 
         # Initialise variables (from config where appropriate).
         self.time = 0.0
@@ -100,8 +105,8 @@ class Galaxy(object):
                                     mass_max = self.mdu_ms,
                                     )
 
-        self.f_sfr = lambda _: config.GALAXY_PARAMS['sfr_init']
-        self.f_z = lambda _: config.GALAXY_PARAMS['z_init']
+        self.f_sfr = lambda x: np.ones_like(x) * config.GALAXY_PARAMS['sfr_init']
+        self.f_z = lambda x: np.ones_like(x) * config.GALAXY_PARAMS['z_init']
 
 
     def evolve(self, dt):
@@ -118,6 +123,9 @@ class Galaxy(object):
         mass_remnant = self.mass_remnant
         x_cc = self.x_cc
         x_wind = self.x_wind
+        if self.include_hn:
+            x_hn = self.x_hn
+            x_hn_wind = self.x_hn_wind
         mass_co = self.mass_co
         x_ia = self.x_ia
 
@@ -133,11 +141,14 @@ class Galaxy(object):
         infall_rate = self.infall_rate
         infall_x = self.infall_x
 
-        # fill the composition of AGB/wind models if they have been approximated.
+        # fill the composition of AGB/wind models if they are to be approximated.
         # this will recycle the composition of the ISM from the time of formation.
         if np.isnan(x_wind[:,z_dim <= z]).any():
             x_wind[:,z_dim <= z] = approx_agb.fill_composition(x_wind[:,z_dim <= z], z, x, x_idx)
             self.x_wind = x_wind
+        if self.include_hn and np.isnan(x_hn_wind[:,z_dim <= z]).any():
+            x_hn_wind[:,z_dim <= z] = approx_agb.fill_composition(x_hn_wind[:,z_dim <= z], z, x, x_idx)
+            self.x_hn_wind = x_hn_wind
 
         # Trim arrays 
         lifetime = lifetime[:,z_dim <= z]
@@ -166,6 +177,9 @@ class Galaxy(object):
             # Filter the model arrays to include only those shedding mass
             x_cc = x_cc[mask]
             x_wind = x_wind[mask]
+            if self.include_hn:
+                x_hn = x_hn[mask]
+                x_hn_wind = x_hn_wind[mask]
             mass_final = mass_final[mask]
             mass_remnant = mass_remnant[mask]
             mass_dim = mass_dim[mask.sum(axis = 1).astype(bool)]
@@ -279,7 +293,7 @@ class Galaxy(object):
             rate_rg = 0.0
         else:
             rate_rg_1 = b_rg * progenitor_component
-            rate_rg_2 = f_quad_int(lambda x: self._ia_donor_integrand(x, type = 'rg'), a = mdl_rg, b = mdu_rg)[0]
+            rate_rg_2 = f_quad_int(lambda x: self._ia_donor_integrand(x, type = 'rg'), a = mdl_rg, b = mdu_rg, n = len(np.arange(mdl_rg, mdu_rg, 0.01)) )[0]
             rate_rg = rate_rg_1 * rate_rg_2
 
         # WD - MS scenario
@@ -290,7 +304,7 @@ class Galaxy(object):
             rate_ms = 0.0
         else:
             rate_ms_1 = b_ms * progenitor_component
-            rate_ms_2 = f_quad_int(lambda x: self._ia_donor_integrand(x, type = 'ms'), a = mdl_ms, b = mdu_ms)[0]
+            rate_ms_2 = f_quad_int(lambda x: self._ia_donor_integrand(x, type = 'ms'), a = mdl_ms, b = mdu_ms, n = len(np.arange(mdl_ms, mdu_ms,0.01)))[0]
             rate_ms = rate_ms_1 * rate_ms_2
 
         rate_ia = rate_rg + rate_ms 
