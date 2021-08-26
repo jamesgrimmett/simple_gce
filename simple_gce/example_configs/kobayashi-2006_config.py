@@ -1,6 +1,4 @@
-"""Configuration parameters to run a model similar to Kobayashi et al., (2006)
-    https://arxiv.org/abs/astro-ph/0608688
-"""
+"""Configuration parameters"""
 
 import os
 
@@ -9,9 +7,8 @@ INSTALL_DIR = '/Users/james/Documents/github_code/simple_gce'
 # Relevant filepaths
 FILEPATHS = {
     # Path to stellar models. Must be a list, even if singular.
-    'stellar_models' : [os.path.join(INSTALL_DIR,'data/kobayashi-2006/kobayashi-2006_sn_scaled.csv')],
-                        #os.path.join(INSTALL_DIR,'data/kobayashi-2006/kobayashi-2006_hn.csv')], 
-    'ia_model' : os.path.join(INSTALL_DIR,'data/kobayashi-2006/kobayashi-2006_ia_scaled.csv'), 
+    'stellar_models' : [os.path.join(INSTALL_DIR,'data/sn_models_example.csv')], 
+    'ia_model' : os.path.join(INSTALL_DIR,'data/ia_model_example.csv'), 
 }
 
 IMF_PARAMS = {
@@ -36,7 +33,6 @@ IA_PARAMS = {
 
 STELLAR_MODELS = {
     'mass_min_cc' : 10, # solar masses, minimum stellar mass for CCSNe.
-    'include_hn' : False, 
 }
 
 GALAXY_PARAMS = {
