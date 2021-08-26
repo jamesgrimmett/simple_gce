@@ -30,14 +30,14 @@ def read_ia_csv():
     diff = abs(check - 1.0)
     
     if diff > 1.e-3:
-        raise error_handing.ProgramError("Ia yields do not sum to one.")
+        raise error_handling.ProgramError("Ia yields do not sum to one.")
 
     scale = 1 / check
 
     df = df * scale
 
     check2 = float(df.sum(axis = 'columns'))
-    diff2 = abs(check - 1.0)
+    diff2 = abs(check2 - 1.0)
     if diff2 >= 1.e-12:
         raise error_handling.ProgramError("Unable to scale mass fractions.")
 
@@ -62,9 +62,10 @@ def fill_arrays(models):
         ej_x_cc : 3D array of ejecta chemical abundances (mass fractions)
                     from CCSNe.
         ej_x_wind : 3D array of ejecta chemical abundances (mass fractions)
-                    from winds.
-        ej_x_hn, ej_weight : ..If more than one ejecta mode, then will need weights
+                    from winds of CC/AGB models.
+        ej_x_hn, ej_x_hn_wind, ej_weight : ..If more than one ejecta mode, then will need weights
     """
+    include_hn = config.STELLAR_MODELS['include_hn']
     elements_all = chem_elements.elements
     el2z = chem_elements.el2z
     # Include only the elements listed in the dataset.
@@ -81,6 +82,9 @@ def fill_arrays(models):
     mass_remnant = np.zeros((len(mass_dim), len(z_dim)))
     x_cc = np.zeros((len(mass_dim), len(z_dim), len(elements)))
     x_wind = np.zeros((len(mass_dim), len(z_dim), len(elements)))
+    if include_hn:
+        x_hn = np.zeros((len(mass_dim), len(z_dim), len(elements)))
+        x_hn_wind = np.zeros((len(mass_dim), len(z_dim), len(elements)))
 
     for i,m in enumerate(mass_dim):
         for j,z in enumerate(z_dim):
@@ -109,7 +113,7 @@ def fill_arrays(models):
                 x_wind[i,j,:] = np.array(model_w[elements]).squeeze()
             else:
                 raise error_handling.UnknownCaseError()
-    
+
     arrays = {
         'mass_dim' : mass_dim,
         'z_dim' : z_dim,
@@ -118,6 +122,10 @@ def fill_arrays(models):
         'mass_final' : mass_final,
         'mass_remnant' : mass_remnant,
         'x_cc' : x_cc,
-        'x_wind' : x_wind  
+        'x_wind' : x_wind,
     }
+    if include_hn:
+        arrays['x_hn'] = x_hn,
+        arrays['x_hn_wind'] = x_hn_wind
+
     return arrays

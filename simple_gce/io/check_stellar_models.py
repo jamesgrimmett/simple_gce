@@ -1,4 +1,7 @@
 """Check stellar model data for completeness, inconsistencies, etc."""
+import pandas as pd
+import numpy as np
+
 from ..utils import chem_elements, error_handling
 from ..gce import approx_agb, approx_lifetime
 from .. import config
@@ -12,6 +15,8 @@ import warnings
 
 # def check_ia(df):
 #   check consistency with config params
+
+el2z = chem_elements.el2z 
 
 REQUIRED_COLUMNS = ['mass', # ZAMS mass
                     'mass_final', # Final mass (e.g. presupernova, after wind-loss)
@@ -37,6 +42,7 @@ def check_initial(df):
     check_columns(df)
     df = check_missing_vals(df)
     check_mass_metallicity_consistent(df)
+    df = check_wind_component(df)
 
     return df
 
@@ -93,7 +99,7 @@ def check_model_types(df):
 
     # Types may include core-collapse, asymptotic giant-branch, thermonuclear,
     # and hypernovae.
-    known_types = ['cc','agb','hn','wind']
+    known_types = ['cc','agb','hn','cc_wind','hn_wind']
 
     types = df.type.unique()
 
@@ -130,6 +136,7 @@ def check_massfracs(df):
     if diff.max() >= 1.e-3:
         raise error_handling.ProgramError("Large errors in sum(mass fractions) for stellar models")
 
+    # Allow scaling of mass fractions. Sometimes there are rounding errors in data tables, etc.
     scale = 1 / check
 
     df.loc[:,elements] = df[elements].mul(scale, axis = 'rows')
@@ -148,3 +155,23 @@ def check_mass_metallicity_consistent(df):
         z_ = df[df.mass == m].Z.unique()
         if set(z_) != set(z_list):
             raise error_handling.NotImplementedError()
+
+def check_wind_component(df):
+    """
+    Ensure that CC/HN models where mass != mass_final, that a row is added 
+    to store wind composition
+    """
+    elements = list(set(df.columns).intersection(set(el2z.keys())))
+
+    for i, model in df[(df.type == 'cc') & (df.mass != df.mass_final)].iterrows():
+        if not 'wind' in df[(df.mass == model.mass) & (df.Z == model.Z)].type:
+            model['type'] = 'wind'
+            model[elements] = np.nan
+            df = df.append(model, ignore_index = True)
+
+    if config.STELLAR_MODELS['include_hn'] == True:
+        for i, model in df[(df.type == 'hn') & (df.mass != df.mass_final)].iterrows():
+            if not 'hn_wind' in df[(df.mass == model.mass) & (df.Z == model.Z)].type:
+                wind_model = pd.Series()
+    
+    return df
