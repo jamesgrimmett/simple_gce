@@ -38,10 +38,6 @@ class ApproxLifetime(object):
         Returns:
             Stellar lifetime in years.
         """
-        if mass <= 0 or z < 0:
-            raise ValueError(
-                    f'Trying to interpolate with unphysical values; ' 
-                    f'mass = {mass} and Z = {z}')
 
         f_lifetime = self.f_lifetime
     
@@ -60,11 +56,6 @@ class ApproxLifetime(object):
             The stellar mass in solar masses.
         """
 
-        if lifetime <= 0 or z < 0:
-            raise ValueError(
-                    f'Trying to interpolate with unphysical values; ' 
-                    f'lifetime = {lifetime} and Z = {z}')
-
         m_arr = self.mass_arr
         arr = np.array([self.lifetime(m,z) for m in m_arr])
     
@@ -82,16 +73,12 @@ class ApproxLifetime(object):
         Returns:
             The stellar mass in solar masses.
         """
-        if lifetime <= 0:
-            raise ValueError(
-                    f'Trying to interpolate with unphysical values; ' 
-                    f'lifetime = {lifetime}')
 
         arr = self.lifetime_arr
         m_arr = self.mass_arr
         m = m_arr[abs(arr - lifetime).argmin()]
     
-        return m
+        return np.round(m,2)
     
     def _read_portinari_lifetimes(self):
         """
