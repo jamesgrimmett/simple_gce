@@ -85,34 +85,58 @@ def fill_arrays(models):
     if include_hn:
         x_hn = np.zeros((len(mass_dim), len(z_dim), len(elements)))
         x_hn_wind = np.zeros((len(mass_dim), len(z_dim), len(elements)))
+        mass_final_hn = np.zeros((len(mass_dim), len(z_dim)))
+        mass_remnant_hn = np.zeros((len(mass_dim), len(z_dim)))
 
     for i,m in enumerate(mass_dim):
         for j,z in enumerate(z_dim):
             model = models[(models.mass == m) & (models.Z == z)]
-            if set(['wind','cc']).issubset(set(model.type)):
+            # TODO: move this to a process row type function
+            lifetime_ = model.lifetime.unique()
+            if len(lifetime_) > 1:
+                raise ValueError(f"Trying to process \n"
+                            f"{model[['mass','Z','type','lifetime']]}\n"
+                            f"No functionality to deal with models of "
+                            f"different lifetimes at the same (m,z) co-ordinate.")
+            else:
+                lifetime[i,j] = float(lifetime_)
+
+            # fill the arrays for each model type present at (m,z)
+            if 'cc' in list(model.type):
                 model_cc = model[model.type == 'cc']
+                x_cc[i,j,:] = np.array(model_cc[elements]).squeeze()
+                mass_final[i,j] = float(model_cc.mass_final)
+                mass_remnant[i,j] = float(model_cc.remnant_mass)
+            else:
+                x_cc[i,j,:] = 0.0
+                
+            if 'wind' in list(model.type):
                 model_w = model[model.type == 'wind']
-                lifetime[i,j] = float(model_cc.lifetime)
-                mass_final[i,j] = float(model_cc.mass_final)
-                mass_remnant[i,j] = float(model_cc.remnant_mass)
-                x_cc[i,j,:] = np.array(model_cc[elements]).squeeze()
                 x_wind[i,j,:] = np.array(model_w[elements]).squeeze()
-            elif model.type.item() == 'cc':
-                model_cc = model[model.type == 'cc']
-                lifetime[i,j] = float(model_cc.lifetime)
-                mass_final[i,j] = float(model_cc.mass_final)
-                mass_remnant[i,j] = float(model_cc.remnant_mass)
-                x_cc[i,j,:] = np.array(model_cc[elements]).squeeze()
-                x_wind[i,j,:] = 0.0
-            elif model.type.item() == 'agb':
+            elif 'agb' in list(model.type):
                 model_w = model[model.type == 'agb']
-                lifetime[i,j] = float(model_w.lifetime)
+                x_wind[i,j,:] = np.array(model_w[elements]).squeeze()
                 mass_final[i,j] = float(model_w.mass_final)
                 mass_remnant[i,j] = float(model_w.remnant_mass)
-                x_cc[i,j,:] = 0.0
-                x_wind[i,j,:] = np.array(model_w[elements]).squeeze()
             else:
-                raise error_handling.UnknownCaseError()
+                x_wind[i,j,:] = 0.0
+
+            if include_hn == True:
+                if 'hn' in list(model.type):
+                    model_hn = model[model.type == 'hn']
+                    x_hn[i,j,:] = np.array(model_hn[elements]).squeeze()
+                    mass_final_hn[i,j] = float(model_hn.mass_final)
+                    mass_remnant_hn[i,j] = float(model_hn.remnant_mass)
+                else:
+                    x_hn[i,j,:] = 0.0
+                    mass_final_hn[i,j] = m
+                    mass_remnant_hn[i,j] = m
+
+                if 'hn_wind' in list(model.type):
+                    model_w = model[model.type == 'wind']
+                    x_hn_wind[i,j,:] = np.array(model_w[elements]).squeeze()
+                else:
+                    x_hn_wind[i,j,:] = 0.0
 
     arrays = {
         'mass_dim' : mass_dim,
@@ -127,5 +151,7 @@ def fill_arrays(models):
     if include_hn:
         arrays['x_hn'] = x_hn,
         arrays['x_hn_wind'] = x_hn_wind
+        arrays['mass_final_hn'] = mass_final_hn
+        arrays['mass_remnant_hn'] = mass_remnant_hn
 
     return arrays

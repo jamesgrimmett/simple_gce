@@ -38,10 +38,14 @@ def check_initial(df):
     Returns:
 
     """
+    include_hn = config.STELLAR_MODELS['include_hn']
+
     df = check_model_types(df)
     check_columns(df)
     df = check_missing_vals(df)
     check_mass_metallicity_consistent(df)
+    if include_hn:
+        df = check_hn_models(df)
     df = check_wind_component(df)
 
     return df
@@ -175,3 +179,48 @@ def check_wind_component(df):
                 wind_model = pd.Series()
     
     return df
+
+def check_hn_models(df):
+    """
+    If HNe models are included, there masses must be either; (i) a subset
+    of the SNe models, or, (ii) intersect with the upper end of SNe masses.
+    The chemical contribution from each mass above the minimum HN mass
+    is a weighted average of the HN and SN models. If (ii), then then SNe 
+    masses will be extended to match the upper mass of HNe models, but added
+    sn models added will be assumed to collapse directly to BH.
+    E.g., (i) would be masses sn: [10, 15, 20, 30] and hn: [20, 30].
+    (ii) would be masses sn: [10, 15, 20, 30] and hn: [20, 30, 40, 60],
+    and the sn masses would be extended to [10, 15, 20, 30, 40, 60].
+    """
+
+    elements = chem_elements.elements
+    elements = list(set(df.columns).intersection(set(elements)))
+
+    mass_hn = np.unique(df[df.type == 'hn'].mass)
+    mass_sn = np.unique(df[df.type == 'sn'].mass)
+    mass_min_hn = np.min(mass_hn)
+    mass_max_sn = np.max(mass_sn)
+
+    hn_xover = mass_hn[mass_hn <= mass_max_sn]
+    sn_xover = mass_sn[mass_sn >= mass_min_hn]
+
+    if not sorted(hn_xover) == sorted(hn_xover):
+        raise ValueError(f"There must be a solid crossover between SN and "
+                         f"HN masses.\nSN masses: {sorted(mass_sn)}\n"
+                         f"HN masses: {sorted(mass_hn)}")
+
+    # Extend SN models to match upper mass of HN models.
+    # New SN models have same properties as corresponding HN model, but
+    # ejecta mass will be zero. Setting ejecta composition should not be
+    # necessary, but do so anyway to be safe.
+    if mass_max_sn < np.max(mass_hn):
+        extend_sn = pd.DataFrame(df[(df.type == 'hn') &
+                                    (df.mass > mass_max_sn)])
+        extend_sn['mass_remnant'] = list(extend_sn.mass)
+        extend_sn['mass_final'] = list(extend_sn.mass)
+        extend_sn.loc[:,elements] = 0.0
+        df = df.append(extend_sn, ignore_index = True)
+
+    return df
+
+    
