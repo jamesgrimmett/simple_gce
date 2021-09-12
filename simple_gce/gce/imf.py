@@ -20,6 +20,8 @@ class IMF(object):
         self.form = form
         # normalising total mass to 1.0
         self.imf_norm = (1.0 - self.slope) / (self.mass_max**(1.0 - self.slope) - self.mass_min**(1.0 - self.slope))
+        p = self.slope + 1
+        self.imf_norm_n = (1.0 - p) / (self.mass_max**(1.0 - p) - self.mass_min**(1.0 - p))
         # TODO: consider separate discrete_IMF and continuous_IMF classes for simplicity.
         if (form == 'discrete'):
             if (masses is None):
@@ -36,8 +38,12 @@ class IMF(object):
 
         self._test_imf()
 
-    def functional_form(self, m):
-        result = self.imf_norm * m ** (-1.0 * self.slope)
+    def functional_form(self, m, alt=False):
+        if alt == False:
+            result = self.imf_norm * m ** (-1.0 * self.slope)
+        else:
+            p = self.slope + 1.0
+            result = self.imf_norm_n * m ** (-1.0 * p)
 
         return result
 
@@ -74,8 +80,8 @@ class IMF(object):
         function when finding the Ia rate.
         """
 
-        imf_norm = self.imf_norm
-        p = self.slope - 1.0
+        imf_norm = self.imf_norm_n
+        p = self.slope + 1.0
         result = imf_norm / (1 - p) * (upper**(1 - p) - lower**(1 - p))
 
         return result
@@ -89,13 +95,15 @@ class IMF(object):
         mass_min_cc = self.mass_min_cc 
 
         lo_mass_models = masses[(masses >= mass_min) & (masses < mass_min_cc)]
-        lo_mass_bins = [(lo_mass_models[i+1] + m)/2 for i,m in enumerate(lo_mass_models[:-1])]        
-        lo_mass_bins.insert(0,mass_min)        
+        lo_mass_bins = [m for i,m in enumerate(lo_mass_models[:-1])]        
+        if mass_min < np.min(masses):
+            lo_mass_bins.insert(0,mass_min)        
         if (masses > mass_min_cc).any():
             lo_mass_bins.append(mass_min_cc)        
             hi_mass_models = masses[(masses >= mass_min_cc) & (masses <= mass_max)]
-            hi_mass_bins = [(hi_mass_models[i+1] + m)/2 for i,m in enumerate(hi_mass_models[:-1])]        
-            hi_mass_bins.append(mass_max)
+            hi_mass_bins = [m for i,m in enumerate(hi_mass_models[:-1])]
+            if mass_max > np.max(masses):
+                hi_mass_bins.append(mass_max)
             mass_bins = np.concatenate((np.array(lo_mass_bins), np.array(hi_mass_bins)))        
         else:
             lo_mass_bins.append(mass_max)        
@@ -111,7 +119,7 @@ class IMF(object):
         if self.form == 'discrete':
             check = 1.0 - np.sum(self.imfdm(mass_list = self.masses))
         else:
-            check = 1.0 - quad_int(self.functional_form, self.mass_min, self.mass_max)
+            check = 1.0 - quad_int(self.functional_form, self.mass_min, self.mass_max, alt = False)
         if abs(check) >= 1.e-5:
             raise error_handling.ProgramError("Error in the IMF implementation. Does not sum to unity.")
 
