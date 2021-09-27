@@ -133,7 +133,7 @@ def fill_arrays(models):
                     mass_remnant_hn[i,j] = m
 
                 if 'hn_wind' in list(model.type):
-                    model_w = model[model.type == 'wind']
+                    model_w = model[model.type == 'hn_wind']
                     x_hn_wind[i,j,:] = np.array(model_w[elements]).squeeze()
                 else:
                     x_hn_wind[i,j,:] = 0.0
@@ -149,7 +149,7 @@ def fill_arrays(models):
         'x_wind' : x_wind,
     }
     if include_hn:
-        arrays['x_hn'] = x_hn,
+        arrays['x_hn'] = x_hn
         arrays['x_hn_wind'] = x_hn_wind
         arrays['mass_final_hn'] = mass_final_hn
         arrays['mass_remnant_hn'] = mass_remnant_hn

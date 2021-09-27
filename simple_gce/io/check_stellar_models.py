@@ -176,7 +176,9 @@ def check_wind_component(df):
     if config.STELLAR_MODELS['include_hn'] == True:
         for i, model in df[(df.type == 'hn') & (df.mass != df.mass_final)].iterrows():
             if not 'hn_wind' in df[(df.mass == model.mass) & (df.Z == model.Z)].type:
-                wind_model = pd.Series()
+                model['type'] = 'hn_wind'
+                model[elements] = np.nan
+                df = df.append(model, ignore_index = True)
     
     return df
 
@@ -197,7 +199,7 @@ def check_hn_models(df):
     elements = list(set(df.columns).intersection(set(elements)))
 
     mass_hn = np.unique(df[df.type == 'hn'].mass)
-    mass_sn = np.unique(df[df.type == 'sn'].mass)
+    mass_sn = np.unique(df[df.type == 'cc'].mass)
     mass_min_hn = np.min(mass_hn)
     mass_max_sn = np.max(mass_sn)
 
