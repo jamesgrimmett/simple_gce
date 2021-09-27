@@ -69,11 +69,9 @@ class Galaxy(object):
         self.historical_z = np.array([[self.time, self.z]])
         self.historical_sfr = np.array([[self.time, self.sfr]])
         self.imf = imf.IMF(masses = self.mass_dim, 
-                                    form = 'discrete',
                                     slope = config.IMF_PARAMS['slope'],
                                     mass_min = config.IMF_PARAMS['mass_min'],
                                     mass_max = config.IMF_PARAMS['mass_max'],
-                                    mass_min_cc = config.STELLAR_MODELS['mass_min_cc']
                                     )
         # Initialise the Ia model parameters
         self.ia_model = load_stellar_models.read_ia_csv()
@@ -99,14 +97,12 @@ class Galaxy(object):
 
         self.masses_rg = np.arange(self.mdl_rg+0.1, self.mdu_rg, 0.1)
         self.imf_ia_rg = imf.IMF(masses = self.masses_rg, 
-                                    form = 'discrete',
                                     slope = self.imf_donor_slope,
                                     mass_min = self.mdl_rg,
                                     mass_max = self.mdu_rg,
                                     )
         self.masses_ms = np.arange(self.mdl_ms+0.1, self.mdu_ms, 0.1) 
         self.imf_ia_ms = imf.IMF(masses = self.masses_ms,
-                                    form = 'discrete',
                                     slope = self.imf_donor_slope,
                                     mass_min = self.mdl_ms,
                                     mass_max = self.mdu_ms,
