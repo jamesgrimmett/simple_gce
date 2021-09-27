@@ -9,18 +9,18 @@ INSTALL_DIR = '/Users/james/Documents/github_code/simple_gce'
 # Relevant filepaths
 FILEPATHS = {
     # Path to stellar models. Must be a list, even if singular.
-    'stellar_models' : [os.path.join(INSTALL_DIR,'data/kobayashi-2006/kobayashi-2006_sn_scaled.csv')],
-                        #os.path.join(INSTALL_DIR,'data/kobayashi-2006/kobayashi-2006_hn.csv')], 
+    'stellar_models' : [os.path.join(INSTALL_DIR,'data/kobayashi-2006/kobayashi-2006_sn_scaled.csv'),
+                        os.path.join(INSTALL_DIR,'data/kobayashi-2006/kobayashi-2006_hn_scaled.csv')], 
     'ia_model' : os.path.join(INSTALL_DIR,'data/kobayashi-2006/kobayashi-2006_ia_scaled.csv'), 
 }
 
 IMF_PARAMS = {
     'mass_min' : 0.05,  # solar masses, minimum stellar mass.
-    'mass_max' : 100.0, # solar masses, maximum stellar mass.
-    'slope'    : 2.35,  # exponent of the IMF (phi(m) ~ m**-slope).
+    'mass_max' : 50.0, # solar masses, maximum stellar mass.
+    'slope'    : 1.35,  # exponent of the IMF (phi(m) ~ m**-slope).
 }
 
-# Parameters for the Ia system, outlined in Kobayashi 2006 Section 2.1
+# Parameters for the Ia system, outlined in Kobayashi 2000 Section 2.1
 IA_PARAMS = {
     'imf_donor_slope' : 0.35, # exponent of the IMF (phi_d(m) ~ m**-slope).
     'mass_co'   : 1.38, # solar masses, CO white dwarf mass for SNeIa.
@@ -28,15 +28,16 @@ IA_PARAMS = {
     'mdu_rg'    : 1.5,  # upper limit of the red giant scenario
     'mdl_ms'    : 1.8,  # lower limit of the main-sequence scenario
     'mdu_ms'    : 2.6,  # upper limit of the main-sequence scenario
-    'mpl'       : 3.0,   # lower limit of WD progenitor 
-    'mpu'       : 8.0,   # upper limit of WD progenitor 
-    'b_rg'      : 0.4,  # fraction of primary stars that produce Ia
-    'b_ms'      : 0.4,  # fraction of primary stars that produce Ia
+    'mpl'       : 3.0,  # lower limit of WD progenitor 
+    'mpu'       : 8.0,  # upper limit of WD progenitor 
+    'b_rg'      : 0.04,  # fraction of primary stars that produce Ia
+    'b_ms'      : 0.04,  # fraction of primary stars that produce Ia
 }
 
 STELLAR_MODELS = {
     'mass_min_cc' : 10, # solar masses, minimum stellar mass for CCSNe.
-    'include_hn' : False, 
+    'include_hn'  : True, 
+    'hn_frac'     : 0.5, # fraction of massive stars which explode as HNe.
 }
 
 GALAXY_PARAMS = {
