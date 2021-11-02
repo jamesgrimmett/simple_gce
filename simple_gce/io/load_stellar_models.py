@@ -49,8 +49,7 @@ def fill_arrays(models):
 
     Args:
         models : Pandas dataframe of stellar models as described in ....
-    Returns:
-        dictionary containing:
+    Returns: Dict
         mass_dim : The coordinates in the mass dimension, i.e., 
                     an ordered list of model masses. 
         z_dim : The coordinates in the Z dimension, i.e., 
@@ -59,11 +58,16 @@ def fill_arrays(models):
         lifetime : 2D array of model lifetimes
         mass_final : 2D array of final mass (e.g., pre-supernova, after winds)
         mass_remnant : 2D array of compact remnant mass (NS/BH/WD).
-        ej_x_cc : 3D array of ejecta chemical abundances (mass fractions)
-                    from CCSNe.
-        ej_x_wind : 3D array of ejecta chemical abundances (mass fractions)
-                    from winds of CC/AGB models.
-        ej_x_hn, ej_x_hn_wind, ej_weight : ..If more than one ejecta mode, then will need weights
+        x_cc : 3D array of ejecta chemical abundances (mass fractions) from CCSNe.
+        x_wind : 3D array of ejecta chemical abundances (mass fractions) from winds (including AGB).
+        w_cc : 2D array of ejecta mass from CCSNe, as a fraction of total initial stellar mass       
+        w_wind : 2D array of ejecta mass from winds, as a fraction of total initial stellar mass       
+        mass_final_hn : 2D array of final mass (e.g., pre-supernova, after winds)
+        mass_remnant_hn : 2D array of compact remnant mass (NS/BH/WD).
+        x_hn : 3D array of ejecta chemical abundances (mass fractions) from HNe.
+        x_hn_wind : 3D array of ejecta chemical abundances (mass fractions) from winds (including AGB).
+        w_hn : 2D array of ejecta mass from HNe, as a fraction of total initial stellar mass       
+        w_hn_wind : 2D array of ejecta mass from winds, as a fraction of total initial stellar mass       
     """
     include_hn = config.STELLAR_MODELS['include_hn']
     elements_all = chem_elements.elements
@@ -91,7 +95,7 @@ def fill_arrays(models):
     for i,m in enumerate(mass_dim):
         for j,z in enumerate(z_dim):
             model = models[(models.mass == m) & (models.Z == z)]
-            # TODO: move this to a process row type function
+            # TODO: move this to a process row function
             lifetime_ = model.lifetime.unique()
             if len(lifetime_) > 1:
                 raise ValueError(f"Trying to process \n"
@@ -138,6 +142,9 @@ def fill_arrays(models):
                 else:
                     x_hn_wind[i,j,:] = 0.0
 
+    w_cc = ((mass_final - mass_remnant).T / mass_dim).T
+    w_wind = ((mass_dim - mass_final.T) / mass_dim).T
+
     arrays = {
         'mass_dim' : mass_dim,
         'z_dim' : z_dim,
@@ -147,11 +154,17 @@ def fill_arrays(models):
         'mass_remnant' : mass_remnant,
         'x_cc' : x_cc,
         'x_wind' : x_wind,
+        'w_cc' : w_cc,
+        'w_wind' : w_wind,
     }
     if include_hn:
-        arrays['x_hn'] = x_hn
-        arrays['x_hn_wind'] = x_hn_wind
+        w_hn = ((mass_final_hn - mass_remnant_hn).T / mass_dim).T
+        w_hn_wind = ((mass_dim - mass_final_hn.T) / mass_dim).T
         arrays['mass_final_hn'] = mass_final_hn
         arrays['mass_remnant_hn'] = mass_remnant_hn
+        arrays['x_hn'] = x_hn
+        arrays['x_hn_wind'] = x_hn_wind
+        arrays['w_hn'] = w_hn
+        arrays['w_hn_wind'] = w_hn_wind
 
     return arrays

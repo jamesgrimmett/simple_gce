@@ -40,6 +40,7 @@ def check_initial(df):
     """
     include_hn = config.STELLAR_MODELS['include_hn']
 
+    df = check_massfracs(df)
     df = check_model_types(df)
     check_columns(df)
     df = check_missing_vals(df)
@@ -122,9 +123,15 @@ def check_model_types(df):
 
         df = approx_agb.fill_agb(df)
 
-    if 'hn' not in types:
-        message = 'HNe are not included.'
-        warnings.warn(message)
+    if config.STELLAR_MODELS['include_hn'] == True:
+        if 'hn' not in types:
+            message = 'HNe are not included.'
+            warnings.warn(message)
+    else:
+        if 'hn' in types:
+            message = 'Config is set to exclude HNe. Removing HNe models.'
+            warnings.warn(message)
+            df = df[df.type != 'hn']
 
     return df
 
@@ -132,13 +139,15 @@ def check_massfracs(df):
     """
     """
     elements = chem_elements.elements
-    elements = list(set(self.df.columns).intersection(set(elements)))
+    elements = list(set(df.columns).intersection(set(elements)))
     
     check = df[elements].sum(axis = 1)
     diff = abs(check - 1.0)
 
     if diff.max() >= 1.e-3:
-        raise error_handling.ProgramError("Large errors in sum(mass fractions) for stellar models")
+        warnings.warn(f'Some stellar models have significant errors ({np.round(diff.max(), 3)}) in sum(mass fractions).')
+    if diff.max() >= 1.e-2:
+        raise error_handling.ProgramError(f"Large errors ({np.round(diff.max(), 3)}) in sum(mass fractions) for stellar models")
 
     # Allow scaling of mass fractions. Sometimes there are rounding errors in data tables, etc.
     scale = 1 / check
@@ -148,6 +157,8 @@ def check_massfracs(df):
     check2 = abs(df[elements].sum(axis = 1) - 1.0)
     if check2.max() >= 1.e-12:
         raise error_handling.ProgramError("Unable to scale mass fractions.")
+
+    return df
 
 def check_mass_metallicity_consistent(df):
     """
@@ -167,18 +178,20 @@ def check_wind_component(df):
     """
     elements = list(set(df.columns).intersection(set(el2z.keys())))
 
-    for i, model in df[(df.type == 'cc') & (df.mass != df.mass_final)].iterrows():
+    for i, model in df[(df.type == 'cc')].iterrows():# & (df.mass != df.mass_final)].iterrows():
         if not 'wind' in df[(df.mass == model.mass) & (df.Z == model.Z)].type:
-            model['type'] = 'wind'
-            model[elements] = np.nan
-            df = df.append(model, ignore_index = True)
+            new_model = model.copy()
+            new_model['type'] = 'wind'
+            new_model[elements] = np.nan
+            df = df.append(new_model, ignore_index = True)
 
     if config.STELLAR_MODELS['include_hn'] == True:
-        for i, model in df[(df.type == 'hn') & (df.mass != df.mass_final)].iterrows():
+        for i, model in df[(df.type == 'hn')].iterrows():# & (df.mass != df.mass_final)].iterrows():
             if not 'hn_wind' in df[(df.mass == model.mass) & (df.Z == model.Z)].type:
-                model['type'] = 'hn_wind'
-                model[elements] = np.nan
-                df = df.append(model, ignore_index = True)
+                new_model = model.copy()
+                new_model['type'] = 'hn_wind'
+                new_model[elements] = np.nan
+                df = df.append(new_model, ignore_index = True)
     
     return df
 
