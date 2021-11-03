@@ -27,7 +27,7 @@ jobs:
     - name: Black
       run: |
         conda install -c conda-forge black
-        python -m black --check .
+        python -m black --check --line-length 90 .
 
   Testing:
     runs-on: ubuntu-latest
