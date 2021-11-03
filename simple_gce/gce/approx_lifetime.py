@@ -1,16 +1,18 @@
 """
 An object to return stellar lifetimes as a function of mass and metallicity.
-Returned values are interpolated using the data provided by Portinari et al. 1997, 
+Returned values are interpolated using the data provided by Portinari et al. 1997,
 Table 14 (http://arxiv.org/abs/astro-ph/9711337).
-This data has mass in range 0.6 Msun - 120 Msun, and Z in range 4.e-4 - 0.05. 
+This data has mass in range 0.6 Msun - 120 Msun, and Z in range 4.e-4 - 0.05.
 Interpolating for values outside this range will return the boundary value of the data.
 """
 
-from .. import config
 import os
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from scipy import interpolate
+
+from .. import config
 
 
 class ApproxLifetime(object):
@@ -130,8 +132,6 @@ def fill_lifetimes(df):
     """
     lt = ApproxLifetime()
 
-    df.loc[:, "lifetime"] = [
-        lt.lifetime(row["mass"], row["Z"]) for _, row in df.iterrows()
-    ]
+    df.loc[:, "lifetime"] = [lt.lifetime(row["mass"], row["Z"]) for _, row in df.iterrows()]
 
     return df

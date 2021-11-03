@@ -1,8 +1,8 @@
-import pytest
 from itertools import product
-import numpy as np
 
-from simple_gce import config
+import numpy as np
+import pytest
+
 from simple_gce.gce import approx_lifetime
 
 lt = approx_lifetime.ApproxLifetime()
@@ -60,10 +60,7 @@ def test_valuerror_mass(lifetime, z):
     """Test the passing unphysical values into interpolation raises
     the expected error.
     """
-    err_msg = (
-        f"Trying to interpolate with unphysical values; "
-        f"lifetime = {lifetime} and Z = {z}"
-    )
+    err_msg = f"Trying to interpolate with unphysical values; " f"lifetime = {lifetime} and Z = {z}"
 
     with pytest.raises(ValueError, match=err_msg):
         _ = lt.mass(lifetime=lifetime, z=z)

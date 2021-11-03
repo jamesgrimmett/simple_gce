@@ -2,14 +2,12 @@
 
 import numpy as np
 from scipy import interpolate
-from scipy.integrate import quad as quad_int
 from scipy.integrate import fixed_quad as f_quad_int
 
+from .. import config
 from ..io import load_stellar_models
 from ..utils import chem_elements, error_handling
-from . import imf, approx_agb, approx_lifetime
-from .. import config
-
+from . import approx_agb, approx_lifetime, imf
 
 el2z = chem_elements.el2z
 lt = approx_lifetime.ApproxLifetime()
@@ -132,7 +130,6 @@ class Galaxy(object):
         # the class attribute (e.g., when updating x_wind)
         mass_dim = self.mass_dim.copy()
         z_dim = self.z_dim.copy()
-        lifetime = self.lifetime.copy()
         lifetime_min = self.lifetime_min.copy()
         w_cc = self.w_cc.copy()
         w_wind = self.w_wind.copy()
@@ -160,13 +157,9 @@ class Galaxy(object):
         # fill the composition of AGB/wind models if they are to be approximated.
         # this will recycle the composition of the ISM from the time of formation.
         if np.isnan(x_wind[:, z_dim <= z]).any():
-            x_wind[:, z_dim <= z] = approx_agb.fill_composition(
-                x_wind[:, z_dim <= z], z, x, x_idx
-            )
+            x_wind[:, z_dim <= z] = approx_agb.fill_composition(x_wind[:, z_dim <= z], z, x, x_idx)
             self.x_wind = np.copy(x_wind)
-        x_wind[:, z_dim > z] = approx_agb.fill_composition(
-            x_wind[:, z_dim > z], z, x, x_idx
-        )
+        x_wind[:, z_dim > z] = approx_agb.fill_composition(x_wind[:, z_dim > z], z, x, x_idx)
 
         if self.include_hn:
             if np.isnan(x_hn_wind[:, z_dim <= z]).any():
@@ -185,11 +178,6 @@ class Galaxy(object):
             ej_x_wind = np.zeros_like(x)
             ej_ia = 0.0
             ej_x_ia = np.zeros_like(x)
-            if self.include_hn:
-                ej_hn = 0.0
-                ejw_hn = np.zeros_like(x)
-                ej_hn_wind = 0.0
-                ejw_hn_wind = np.zeros_like(x)
         else:
             # Time and metallicity at the point of formation for each stellar model
             t_birth = time - lifetime_min
@@ -254,18 +242,14 @@ class Galaxy(object):
                 w_hn = w_hn[hn_mask]
                 w_hn_wind = w_hn_wind[hn_mask]
 
-                if not all(hn_mask == True):
+                if not all(hn_mask is True):
                     # total mass of stars of mass `m` born from the gas
                     mass_m = sfr_birth * imfdm
                     # ejecta mass from stars (core collacse/winds) for each mass range
                     ej_cc_1_ = w_cc[~hn_mask] * mass_m[~hn_mask]
                     ej_cc_2_ = w_cc[hn_mask] * mass_m[hn_mask]
                     # total ejecta mass from massive stars (core collapse/winds)
-                    ej_cc = (
-                        ej_cc_1_.sum()
-                        + (1 - hn_frac) * ej_cc_2_.sum()
-                        + hn_frac * ej_hn_.sum()
-                    )
+                    ej_cc = ej_cc_1_.sum() + (1 - hn_frac) * ej_cc_2_.sum() + hn_frac * ej_hn_.sum()
                     # ejecta mass (per element) from massive stars (core collapse/winds)
                     ej_x_cc = (
                         np.matmul(mass_m[~hn_mask], x_cc[~hn_mask])
@@ -295,9 +279,9 @@ class Galaxy(object):
                     # ejecta mass (per element) from massive stars (core collapse/winds)
                     ej_cc_ = sfr_birth * imfdm
                     ej_hn_ = sfr_birth[hn_mask] * imfdm[hn_mask]
-                    ej_x_cc = (1 - hn_frac) * np.matmul(
-                        ej_cc_, x_cc
-                    ) + hn_frac * np.matmul(ej_hn_, x_hn)
+                    ej_x_cc = (1 - hn_frac) * np.matmul(ej_cc_, x_cc) + hn_frac * np.matmul(
+                        ej_hn_, x_hn
+                    )
                     # ejecta mass from winds for each mass range
                     ej_wind_ = w_wind * sfr_birth * imfdm
                     # total ejecta mass from winds
@@ -305,9 +289,7 @@ class Galaxy(object):
                     # ejecta mass (per element) from winds
                     ej_wind_ = sfr_birth * imfdm
                     ej_hn_wind_ = sfr_birth[hn_mask] * imfdm[hn_mask]
-                    ej_x_wind = np.matmul(ej_wind_, x_wind) + np.matmul(
-                        ej_hn_wind_, x_hn_wind
-                    )
+                    ej_x_wind = np.matmul(ej_wind_, x_wind) + np.matmul(ej_hn_wind_, x_hn_wind)
 
             # Ia
             # TODO: use fe from avg. stellar value rather than gas, then use fe_h >= -1.1
@@ -337,9 +319,7 @@ class Galaxy(object):
             x = self.x
 
         if any(np.isnan(x)):
-            raise RuntimeError(
-                "Error in evolution. NaNs in the chemical abundances in the gas."
-            )
+            raise RuntimeError("Error in evolution. NaNs in the chemical abundances in the gas.")
         self.x = x
         self.z = (
             np.sum(x)
@@ -372,10 +352,7 @@ class Galaxy(object):
         # infall_rate = 1.0 / INFALL_TIMESCALE * np.exp(-time / INFALL_TIMESCALE) * TOTAL_MASS
 
         infall_rate = (
-            1.0
-            * (time / (INFALL_TIMESCALE ** 2))
-            * np.exp(-time / INFALL_TIMESCALE)
-            * TOTAL_MASS
+            1.0 * (time / (INFALL_TIMESCALE ** 2)) * np.exp(-time / INFALL_TIMESCALE) * TOTAL_MASS
         )
 
         return infall_rate
@@ -569,7 +546,8 @@ class Galaxy(object):
                 min_neg_idx = int(np.argwhere(diff == min_neg))
                 if abs(min_neg_idx - min_pos_idx) != 1:
                     raise RuntimeError(
-                        "Error in interpolation between stellar models. Unable to select appropriate models to interpolate between"
+                        "Error in interpolation between stellar models. Unable to select "
+                        "appropriate models to interpolate between"
                     )
                 mask_lower = diff == min_neg
                 mask_z = mask_upper.astype(bool) | mask_lower.astype(bool)
@@ -596,13 +574,9 @@ class Galaxy(object):
             raise error_handling.ProgramError("Error in evolution. SUM(X) != 1.0")
         if self.galaxy_mass == 0.0:
             if self.star_mass != 0.0 or self.gas_mass != 0.0:
-                raise error_handling.ProgramError(
-                    "Error in evolution. Total mass not conserved"
-                )
+                raise error_handling.ProgramError("Error in evolution. Total mass not conserved")
         elif abs(((self.star_mass + self.gas_mass) / self.galaxy_mass) - 1.0) > 1.0e-8:
-            raise error_handling.ProgramError(
-                "Error in evolution. Total mass not conserved"
-            )
+            raise error_handling.ProgramError("Error in evolution. Total mass not conserved")
         if self.galaxy_mass > TOTAL_MASS:
             raise error_handling.ProgramError(
                 "Error in evolution. Galaxy mass exceeds mass available in system"

@@ -2,12 +2,12 @@
 Load stellar models from CSV file
 """
 
-import os
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 from .. import config
-from . import check_stellar_models
 from ..utils import chem_elements, error_handling
+from . import check_stellar_models
 
 
 def read_stellar_csv():
@@ -67,7 +67,7 @@ def fill_arrays(models):
         mass_final_hn : 2D array of final mass (e.g., pre-supernova, after winds)
         mass_remnant_hn : 2D array of compact remnant mass (NS/BH/WD).
         x_hn : 3D array of ejecta chemical abundances (mass fractions) from HNe.
-        x_hn_wind : 3D array of ejecta chemical abundances (mass fractions) from winds (including AGB).
+        x_hn_wind : 3D array of ejecta chemical abundances (mass fractions) from winds (inc. AGB).
         w_hn : 2D array of ejecta mass from HNe, as a fraction of total initial stellar mass
         w_hn_wind : 2D array of ejecta mass from winds, as a fraction of total initial stellar mass
     """
@@ -129,7 +129,7 @@ def fill_arrays(models):
             else:
                 x_wind[i, j, :] = 0.0
 
-            if include_hn == True:
+            if include_hn is True:
                 if "hn" in list(model.type):
                     model_hn = model[model.type == "hn"]
                     x_hn[i, j, :] = np.array(model_hn[elements]).squeeze()

@@ -13,9 +13,7 @@ FILEPATHS = {
         os.path.join(INSTALL_DIR, "data/kobayashi-2006/kobayashi-2006_sn_scaled.csv"),
         os.path.join(INSTALL_DIR, "data/kobayashi-2006/kobayashi-2006_hn_scaled.csv"),
     ],
-    "ia_model": os.path.join(
-        INSTALL_DIR, "data/kobayashi-2006/kobayashi-2006_ia_scaled.csv"
-    ),
+    "ia_model": os.path.join(INSTALL_DIR, "data/kobayashi-2006/kobayashi-2006_ia_scaled.csv"),
 }
 
 IMF_PARAMS = {

@@ -1,11 +1,12 @@
 """Check stellar model data for completeness, inconsistencies, etc."""
-import pandas as pd
-import numpy as np
-
-from ..utils import chem_elements, error_handling
-from ..gce import approx_agb, approx_lifetime
-from .. import config
 import warnings
+
+import numpy as np
+import pandas as pd
+
+from .. import config
+from ..gce import approx_agb, approx_lifetime
+from ..utils import chem_elements, error_handling
 
 # TODO:
 # check mass limits provided in config.
@@ -73,9 +74,7 @@ def check_columns(df):
     unknown_columns = remaining_columns.difference(set(el2z.keys()))
 
     if not set(REQUIRED_COLUMNS).issubset(set(df.columns)):
-        raise error_handling.InsufficientDataError(
-            "Stellar data is missing required columns."
-        )
+        raise error_handling.InsufficientDataError("Stellar data is missing required columns.")
     elif len(unknown_columns) != 0:
         raise error_handling.UnknownCaseError(
             f"Unknown columns/elements in stellar data.\n{unknown_columns}"
@@ -89,20 +88,20 @@ def check_missing_vals(df):
 
     if not df[df["mass_final"].isna()].empty:
         raise error_handling.InsufficientDataError(
-            f"Missing some entries for mass_final.\
-                        If there are no winds/mass loss in a model, set mass_final = mass."
+            "Missing some entries for mass_final. "
+            "If there are no winds/mass loss in a model, set mass_final = mass."
         )
     if not df[df["remnant_mass"].isna()].empty:
         raise error_handling.InsufficientDataError(
-            f"Missing some entries for remnant_mass. \
-                        If there is no remnant (e.g. SNe Ia), set this column to zero. \
-                        For AGB stars, set mass_remnant = mass_final"
+            "Missing some entries for remnant_mass. "
+            "If there is no remnant (e.g. SNe Ia), set this column to zero. "
+            "For AGB stars, set mass_remnant = mass_final"
         )
     if not df[df["Z"].isna()].empty:
         raise error_handling.InsufficientDataError(
-            f"Missing some entries for Z (metallicity). \
-                        If metallicity is not relevant, or you have models with a single value \
-                        of metallicity, set this column to zero for those models."
+            "Missing some entries for Z (metallicity). "
+            "If metallicity is not relevant, or you have models with a single value "
+            "of metallicity, set this column to zero for those models."
         )
     if not df[df["lifetime"].isna()].empty:
         warnings.warn("Missing stellar lifetime data. Filling with approx values.")
@@ -131,13 +130,15 @@ def check_model_types(df):
 
     if "agb" not in types:
         mass_min_cc = config.STELLAR_MODELS["mass_min_cc"]
-        message = f"No AGB models found. Wind mass from stars with mass < {mass_min_cc} \
-             Msun will be approximated, and wind chemical composition will be unchanged from formation."
+        message = (
+            f"No AGB models found. Wind mass from stars with mass < {mass_min_cc} Msun wil be "
+            f"approximated, and wind chemical composition will be unchanged from formation."
+        )
         warnings.warn(message)
 
         df = approx_agb.fill_agb(df)
 
-    if config.STELLAR_MODELS["include_hn"] == True:
+    if config.STELLAR_MODELS["include_hn"] is True:
         if "hn" not in types:
             message = "HNe are not included."
             warnings.warn(message)
@@ -160,7 +161,8 @@ def check_massfracs(df):
 
     if diff.max() >= 1.0e-3:
         warnings.warn(
-            f"Some stellar models have significant errors ({np.round(diff.max(), 3)}) in sum(mass fractions)."
+            f"Some stellar models have significant errors ({np.round(diff.max(), 3)}) "
+            f"in sum(mass fractions)."
         )
     if diff.max() >= 1.0e-2:
         raise error_handling.ProgramError(
@@ -197,20 +199,18 @@ def check_wind_component(df):
     """
     elements = list(set(df.columns).intersection(set(el2z.keys())))
 
-    for i, model in df[
-        (df.type == "cc")
-    ].iterrows():  # & (df.mass != df.mass_final)].iterrows():
-        if not "wind" in df[(df.mass == model.mass) & (df.Z == model.Z)].type:
+    for i, model in df[(df.type == "cc")].iterrows():  # & (df.mass != df.mass_final)].iterrows():
+        if "wind" not in df[(df.mass == model.mass) & (df.Z == model.Z)].type:
             new_model = model.copy()
             new_model["type"] = "wind"
             new_model[elements] = np.nan
             df = df.append(new_model, ignore_index=True)
 
-    if config.STELLAR_MODELS["include_hn"] == True:
+    if config.STELLAR_MODELS["include_hn"] is True:
         for i, model in df[
             (df.type == "hn")
         ].iterrows():  # & (df.mass != df.mass_final)].iterrows():
-            if not "hn_wind" in df[(df.mass == model.mass) & (df.Z == model.Z)].type:
+            if "hn_wind" not in df[(df.mass == model.mass) & (df.Z == model.Z)].type:
                 new_model = model.copy()
                 new_model["type"] = "hn_wind"
                 new_model[elements] = np.nan
@@ -237,11 +237,9 @@ def check_hn_models(df):
 
     mass_hn = np.unique(df[df.type == "hn"].mass)
     mass_sn = np.unique(df[df.type == "cc"].mass)
-    mass_min_hn = np.min(mass_hn)
     mass_max_sn = np.max(mass_sn)
 
     hn_xover = mass_hn[mass_hn <= mass_max_sn]
-    sn_xover = mass_sn[mass_sn >= mass_min_hn]
 
     if not sorted(hn_xover) == sorted(hn_xover):
         raise ValueError(

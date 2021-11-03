@@ -1,7 +1,7 @@
 """The initial mass function."""
 
 import numpy as np
-from scipy.integrate import quad as quad_int
+
 from .. import config
 from ..utils import error_handling
 
@@ -31,9 +31,9 @@ class IMF(object):
     """
 
     def __init__(self, slope, masses, mass_min=None, mass_max=None):
-        if mass_min == None:
+        if mass_min is None:
             mass_min = config.IMF_PARAMS["mass_min"]
-        if mass_max == None:
+        if mass_max is None:
             mass_max = config.IMF_PARAMS["mass_max"]
         self.mass_min = mass_min
         self.mass_max = mass_max
@@ -61,7 +61,7 @@ class IMF(object):
         """ """
         try:
             iter(mass_list)
-        except TypeError as err:
+        except TypeError:
             mass_list = [mass_list]
         masses = self.masses
         mass_bins = self.mass_bins
