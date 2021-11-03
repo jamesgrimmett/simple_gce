@@ -3,36 +3,53 @@ name: Main
 on: [push, pull_request]
 
 jobs:
-build-linux:
-  runs-on: ubuntu-latest
-  strategy:
-    max-parallel: 5
+  Linting:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.9
+    - name: Add conda to system path
+      run: |
+        # $CONDA is an environment variable pointing to the root of the miniconda directory
+        echo $CONDA/bin >> $GITHUB_PATH
+    - name: Install dependencies
+      run: |
+        conda env update --file environment.yml --name base
+    - name: Flake8
+      run: |
+        conda install -c conda-forge flake8
+        # stop the build if there are Python syntax errors or undefined names
+        python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings.
+        python -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=90 --statistics
+    - name: Black
+      run: |
+        conda install -c conda-forge black
+        python -m black --check .
 
-  steps:
-  - uses: actions/checkout@v2
-  - name: Set up Python 3.9
-    uses: actions/setup-python@v2
-    with:
-      python-version: 3.9
-  - name: Add conda to system path
-    run: |
-      # $CONDA is an environment variable pointing to the root of the miniconda directory
-      echo $CONDA/bin >> $GITHUB_PATH
-  - name: Install dependencies
-    run: |
-      conda env update --file environment.yml --name base
-  - name: Flake8
-    run: |
-      conda install -c conda-forge flake8
-      # stop the build if there are Python syntax errors or undefined names
-      python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-      # exit-zero treats all errors as warnings.
-      python -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=90 --statistics
-  - name: Black
-    run: |
-      conda install -c conda-forge black
-      python -m black --check .
-  - name: Pytest
-    run: |
-      conda install -c conda-forge pytest
-      pytest
+  Testing:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.9
+    - name: Add conda to system path
+      run: |
+        # $CONDA is an environment variable pointing to the root of the miniconda directory
+        echo $CONDA/bin >> $GITHUB_PATH
+    - name: Install dependencies
+      run: |
+        conda env update --file environment.yml --name base
+    - name: Pytest
+      run: |
+        conda install -c conda-forge pytest
+        pytest
