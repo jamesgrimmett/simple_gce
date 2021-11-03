@@ -48,5 +48,6 @@ jobs:
         conda env update --file environment.yml --name base
     - name: Pytest
       run: |
+        pip install -e .
         conda install -c conda-forge pytest
         pytest
