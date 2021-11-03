@@ -45,9 +45,10 @@ jobs:
         echo $CONDA/bin >> $GITHUB_PATH
     - name: Install dependencies
       run: |
-        conda env update --file environment.yml --name base
+        conda env update --file environment.yml --name gce
     - name: Pytest
       run: |
+        conda activate gce
         pip install -e .
         conda install -c conda-forge pytest
         pytest
