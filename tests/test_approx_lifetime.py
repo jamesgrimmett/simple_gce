@@ -1,7 +1,6 @@
 from itertools import product
 
 import numpy as np
-import pytest
 
 from simple_gce.gce import approx_lifetime
 
