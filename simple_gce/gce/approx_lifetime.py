@@ -119,6 +119,7 @@ class ApproxLifetime(object):
         z = np.array(data[z_vals])
     
         #f = interpolate.RectBivariateSpline(x,y,z)
+        # TODO: Consider interpolating in log-space
         f = interpolate.interp2d(x,y,np.transpose(z))
         return f
     

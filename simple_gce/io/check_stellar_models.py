@@ -38,10 +38,15 @@ def check_initial(df):
     Returns:
 
     """
+    include_hn = config.STELLAR_MODELS['include_hn']
+
+    df = check_massfracs(df)
     df = check_model_types(df)
     check_columns(df)
     df = check_missing_vals(df)
     check_mass_metallicity_consistent(df)
+    if include_hn:
+        df = check_hn_models(df)
     df = check_wind_component(df)
 
     return df
@@ -118,9 +123,15 @@ def check_model_types(df):
 
         df = approx_agb.fill_agb(df)
 
-    if 'hn' not in types:
-        message = 'HNe are not included.'
-        warnings.warn(message)
+    if config.STELLAR_MODELS['include_hn'] == True:
+        if 'hn' not in types:
+            message = 'HNe are not included.'
+            warnings.warn(message)
+    else:
+        if 'hn' in types:
+            message = 'Config is set to exclude HNe. Removing HNe models.'
+            warnings.warn(message)
+            df = df[df.type != 'hn']
 
     return df
 
@@ -128,13 +139,15 @@ def check_massfracs(df):
     """
     """
     elements = chem_elements.elements
-    elements = list(set(self.df.columns).intersection(set(elements)))
+    elements = list(set(df.columns).intersection(set(elements)))
     
     check = df[elements].sum(axis = 1)
     diff = abs(check - 1.0)
 
     if diff.max() >= 1.e-3:
-        raise error_handling.ProgramError("Large errors in sum(mass fractions) for stellar models")
+        warnings.warn(f'Some stellar models have significant errors ({np.round(diff.max(), 3)}) in sum(mass fractions).')
+    if diff.max() >= 1.e-2:
+        raise error_handling.ProgramError(f"Large errors ({np.round(diff.max(), 3)}) in sum(mass fractions) for stellar models")
 
     # Allow scaling of mass fractions. Sometimes there are rounding errors in data tables, etc.
     scale = 1 / check
@@ -144,6 +157,8 @@ def check_massfracs(df):
     check2 = abs(df[elements].sum(axis = 1) - 1.0)
     if check2.max() >= 1.e-12:
         raise error_handling.ProgramError("Unable to scale mass fractions.")
+
+    return df
 
 def check_mass_metallicity_consistent(df):
     """
@@ -163,15 +178,64 @@ def check_wind_component(df):
     """
     elements = list(set(df.columns).intersection(set(el2z.keys())))
 
-    for i, model in df[(df.type == 'cc') & (df.mass != df.mass_final)].iterrows():
+    for i, model in df[(df.type == 'cc')].iterrows():# & (df.mass != df.mass_final)].iterrows():
         if not 'wind' in df[(df.mass == model.mass) & (df.Z == model.Z)].type:
-            model['type'] = 'wind'
-            model[elements] = np.nan
-            df = df.append(model, ignore_index = True)
+            new_model = model.copy()
+            new_model['type'] = 'wind'
+            new_model[elements] = np.nan
+            df = df.append(new_model, ignore_index = True)
 
     if config.STELLAR_MODELS['include_hn'] == True:
-        for i, model in df[(df.type == 'hn') & (df.mass != df.mass_final)].iterrows():
+        for i, model in df[(df.type == 'hn')].iterrows():# & (df.mass != df.mass_final)].iterrows():
             if not 'hn_wind' in df[(df.mass == model.mass) & (df.Z == model.Z)].type:
-                wind_model = pd.Series()
+                new_model = model.copy()
+                new_model['type'] = 'hn_wind'
+                new_model[elements] = np.nan
+                df = df.append(new_model, ignore_index = True)
     
     return df
+
+def check_hn_models(df):
+    """
+    If HNe models are included, there masses must be either; (i) a subset
+    of the SNe models, or, (ii) intersect with the upper end of SNe masses.
+    The chemical contribution from each mass above the minimum HN mass
+    is a weighted average of the HN and SN models. If (ii), then then SNe 
+    masses will be extended to match the upper mass of HNe models, but added
+    sn models added will be assumed to collapse directly to BH.
+    E.g., (i) would be masses sn: [10, 15, 20, 30] and hn: [20, 30].
+    (ii) would be masses sn: [10, 15, 20, 30] and hn: [20, 30, 40, 60],
+    and the sn masses would be extended to [10, 15, 20, 30, 40, 60].
+    """
+
+    elements = chem_elements.elements
+    elements = list(set(df.columns).intersection(set(elements)))
+
+    mass_hn = np.unique(df[df.type == 'hn'].mass)
+    mass_sn = np.unique(df[df.type == 'cc'].mass)
+    mass_min_hn = np.min(mass_hn)
+    mass_max_sn = np.max(mass_sn)
+
+    hn_xover = mass_hn[mass_hn <= mass_max_sn]
+    sn_xover = mass_sn[mass_sn >= mass_min_hn]
+
+    if not sorted(hn_xover) == sorted(hn_xover):
+        raise ValueError(f"There must be a solid crossover between SN and "
+                         f"HN masses.\nSN masses: {sorted(mass_sn)}\n"
+                         f"HN masses: {sorted(mass_hn)}")
+
+    # Extend SN models to match upper mass of HN models.
+    # New SN models have same properties as corresponding HN model, but
+    # ejecta mass will be zero. Setting ejecta composition should not be
+    # necessary, but do so anyway to be safe.
+    if mass_max_sn < np.max(mass_hn):
+        extend_sn = pd.DataFrame(df[(df.type == 'hn') &
+                                    (df.mass > mass_max_sn)])
+        extend_sn['mass_remnant'] = list(extend_sn.mass)
+        extend_sn['mass_final'] = list(extend_sn.mass)
+        extend_sn.loc[:,elements] = 0.0
+        df = df.append(extend_sn, ignore_index = True)
+
+    return df
+
+    

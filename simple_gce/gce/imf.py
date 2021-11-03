@@ -7,8 +7,28 @@ from ..utils import error_handling
 
 class IMF(object):
     """
+    Constructs a discretised IMF. For the specified masses, a normalised IMF
+    is instantiated, where each mass represents a section `dm` of the
+    continuous IMF.  
+    Assumed to be of the form phi(m) = N * m **-p, where N is a normalisation
+    constant.
+
+    Attributes
+    ----------
+    slope: numeric
+        The exponent of the IMF. 
+    masses: Sequence[numeric]
+        The list of masses to set the discretisation
+    mass_min: numeric, optional
+        The minimum mass existing in the distribution
+    mass_max: numeric, optional
+        The maximum mass existing in the distribution
+
+    Methods
+    -------
+
     """
-    def __init__(self, form, slope, masses = None, mass_min = None, mass_max = None, mass_min_cc = None):
+    def __init__(self, slope, masses, mass_min = None, mass_max = None):
         if mass_min == None:
             mass_min = config.IMF_PARAMS['mass_min']
         if mass_max == None:
@@ -16,27 +36,19 @@ class IMF(object):
         self.mass_min = mass_min
         self.mass_max = mass_max
         self.mass_min_cc = config.STELLAR_MODELS['mass_min_cc']
-        self.slope = abs(slope) # minus sign is coded explicitly throughout the class 
-        self.form = form
+        self.slope = abs(slope) # minus sign is added explicitly throughout the class 
         # normalising total mass to 1.0
         self.imf_norm = (1.0 - self.slope) / (self.mass_max**(1.0 - self.slope) - self.mass_min**(1.0 - self.slope))
-        # TODO: consider separate discrete_IMF and continuous_IMF classes for simplicity.
-        if (form == 'discrete'):
-            if (masses is None):
-                raise error_handling.ProgramError(f"You must pass a list of masses for a discrete IMF")
-            else:
-                self.masses = masses
-                self.mass_bins = self._generate_mass_bins()
-                self.dms = self.mass_bins[:,1] - self.mass_bins[:,0]
-        elif (form == 'continuous'):
-            # Placeholder in case we need to do something here
-            pass
-        else:
-            raise error_handling.ProgramError(f"Can only process form = continuous or discrete")
+        self.masses = masses
+        self.mass_bins = self._generate_mass_bins()
+        self.dms = self.mass_bins[:,1] - self.mass_bins[:,0]
 
-        self._test_imf()
+        self._validate_imf()
 
     def functional_form(self, m):
+        """
+        Returns the value of the IMF at the specified m
+        """
         result = self.imf_norm * m ** (-1.0 * self.slope)
 
         return result
@@ -61,6 +73,7 @@ class IMF(object):
     
     def integrate(self, lower, upper):
         """
+        Integrates the IMF between the specified lower and upper values.
         """
         imf_norm = self.imf_norm
         p = self.slope
@@ -68,14 +81,14 @@ class IMF(object):
 
         return result
 
-    def integrate_ia(self, lower, upper):
+    def _integrate_mod(self, lower, upper):
         """
-        The function is only called for integrating over the Ia progenitor
-        function when finding the Ia rate.
+        Integrates over 1/m * phi(m) dm. This is only called for integrating
+        over the Ia progenitor function when finding the Ia rate.
         """
 
         imf_norm = self.imf_norm
-        p = self.slope - 1.0
+        p = self.slope + 1.0
         result = imf_norm / (1 - p) * (upper**(1 - p) - lower**(1 - p))
 
         return result
@@ -89,13 +102,15 @@ class IMF(object):
         mass_min_cc = self.mass_min_cc 
 
         lo_mass_models = masses[(masses >= mass_min) & (masses < mass_min_cc)]
-        lo_mass_bins = [(lo_mass_models[i+1] + m)/2 for i,m in enumerate(lo_mass_models[:-1])]        
-        lo_mass_bins.insert(0,mass_min)        
+        lo_mass_bins = [m for i,m in enumerate(lo_mass_models[:-1])]        
+        if mass_min < np.min(masses):
+            lo_mass_bins.insert(0,mass_min)        
         if (masses > mass_min_cc).any():
             lo_mass_bins.append(mass_min_cc)        
             hi_mass_models = masses[(masses >= mass_min_cc) & (masses <= mass_max)]
-            hi_mass_bins = [(hi_mass_models[i+1] + m)/2 for i,m in enumerate(hi_mass_models[:-1])]        
-            hi_mass_bins.append(mass_max)
+            hi_mass_bins = [m for i,m in enumerate(hi_mass_models[:-1])]
+            if mass_max > np.max(masses):
+                hi_mass_bins.append(mass_max)
             mass_bins = np.concatenate((np.array(lo_mass_bins), np.array(hi_mass_bins)))        
         else:
             lo_mass_bins.append(mass_max)        
@@ -105,13 +120,10 @@ class IMF(object):
 
         return mass_bins
     
-    def _test_imf(self):
+    def _validate_imf(self):
         """
         """
-        if self.form == 'discrete':
-            check = 1.0 - np.sum(self.imfdm(mass_list = self.masses))
-        else:
-            check = 1.0 - quad_int(self.functional_form, self.mass_min, self.mass_max)
+        check = 1.0 - np.sum(self.imfdm(mass_list = self.masses))
         if abs(check) >= 1.e-5:
             raise error_handling.ProgramError("Error in the IMF implementation. Does not sum to unity.")
 
