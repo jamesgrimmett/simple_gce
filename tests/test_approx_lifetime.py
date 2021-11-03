@@ -31,36 +31,3 @@ def test_recover_portinari_mass():
             actual_val = float(row["M"])
 
             assert np.round(interp_val, 1) == actual_val
-
-
-TEST_INPUTS = [
-    (0.0, 0.0),
-    (1.0, -1.0),
-    (0.0, -1.0),
-]
-TEST_IDS = ["invalidmass", "invalidz", "invalidboth"]
-
-
-@pytest.mark.parametrize("m,z", TEST_INPUTS, ids=TEST_IDS)
-def test_valuerror_lifetime(m, z):
-    """Test the passing unphysical values into interpolation raises
-    the expected error.
-    """
-    err_msg = f"Trying to interpolate with unphysical values; " f"mass = {m} and Z = {z}"
-
-    with pytest.raises(ValueError, match=err_msg):
-        _ = lt.lifetime(mass=m, z=z)
-
-
-TEST_IDS = ["invalidlifetime", "invalidz", "invalidboth"]
-
-
-@pytest.mark.parametrize("lifetime,z", TEST_INPUTS, ids=TEST_IDS)
-def test_valuerror_mass(lifetime, z):
-    """Test the passing unphysical values into interpolation raises
-    the expected error.
-    """
-    err_msg = f"Trying to interpolate with unphysical values; " f"lifetime = {lifetime} and Z = {z}"
-
-    with pytest.raises(ValueError, match=err_msg):
-        _ = lt.mass(lifetime=lifetime, z=z)
