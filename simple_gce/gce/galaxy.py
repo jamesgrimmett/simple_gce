@@ -24,7 +24,7 @@ class Galaxy(object):
     Attributes
     ----------
     include_hn: bool
-        True if HNe are to be included as a source of chemical enrichment. If False, 
+        True if HNe are to be included as a source of chemical enrichment. If False,
         only SNe will be included as a chemical end product for massive stars.
     stellar_models: pd.DataFrame
         The properties of stellar models and their end products to included in the evolution.
@@ -87,13 +87,13 @@ class Galaxy(object):
     x: Sequence[np.number]
         The mass fractions of elements in the gas. The indices of elements can be found with x_idx.
     infall_x: Sequence[np.number]
-        The mass fraction abundances of the material infalling from the halo. 
+        The mass fraction abundances of the material infalling from the halo.
     historical_z: np.ndarray
         The time and metallicity for each previous timestep.
     historical_sfr: np.ndarray
         The time and SFR for each previous timestep.
     imf: Type[IMF]
-        An IMF object containing information about the initial mass function of stars in the 
+        An IMF object containing information about the initial mass function of stars in the
         Galaxy. The IMF has been discretised over the stellar masses provided to the model.
     lifetime_min: np.ndarray
         The minimum lifetime for the representative range of each stellar models, in
@@ -109,9 +109,9 @@ class Galaxy(object):
         The slope of the IMF representing donor stars in the SNe Ia system.
     mdl_rg: np.number
         The minimum initial mass of donor stars in red giant - white dwarf SNe Ia systems.
-    mdu_rg: np.number 
+    mdu_rg: np.number
         The maximum initial mass of donor stars in red giant - white dwarf SNe Ia systems.
-    mdl_ms: np.number 
+    mdl_ms: np.number
         The minimum initial mass of donor stars in main sequence - white dwarf SNe Ia systems.
     mdu_ms: np.number
         The maximum intial mass of donor stars in main sequence - white dwarf SNe Ia systems.
