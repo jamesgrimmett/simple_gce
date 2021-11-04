@@ -2,46 +2,48 @@
 Load stellar models from CSV file
 """
 
-import os
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 from .. import config
-from . import check_stellar_models
 from ..utils import chem_elements, error_handling
+from . import check_stellar_models
 
 
 def read_stellar_csv():
-    filepath = config.FILEPATHS['stellar_models']
+    filepath = config.FILEPATHS["stellar_models"]
     df = pd.DataFrame()
 
     for fp in filepath:
         df_ = pd.read_csv(fp)
-        df = pd.concat((df,df_))
+        df = pd.concat((df, df_))
 
-    df = check_stellar_models.check_initial(df) 
-    
+    df = check_stellar_models.check_initial(df)
+
     return df
 
+
 def read_ia_csv():
-    filepath = config.FILEPATHS['ia_model']
+    filepath = config.FILEPATHS["ia_model"]
     df = pd.read_csv(filepath)
 
-    check = float(df.sum(axis = 'columns'))
+    check = float(df.sum(axis="columns"))
     diff = abs(check - 1.0)
-    
-    if diff > 1.e-3:
+
+    if diff > 1.0e-3:
         raise error_handling.ProgramError("Ia yields do not sum to one.")
 
     scale = 1 / check
 
     df = df * scale
 
-    check2 = float(df.sum(axis = 'columns'))
+    check2 = float(df.sum(axis="columns"))
     diff2 = abs(check2 - 1.0)
-    if diff2 >= 1.e-12:
+    if diff2 >= 1.0e-12:
         raise error_handling.ProgramError("Unable to scale mass fractions.")
 
     return df
+
 
 def fill_arrays(models):
     """
@@ -50,34 +52,34 @@ def fill_arrays(models):
     Args:
         models : Pandas dataframe of stellar models as described in ....
     Returns: Dict
-        mass_dim : The coordinates in the mass dimension, i.e., 
-                    an ordered list of model masses. 
-        z_dim : The coordinates in the Z dimension, i.e., 
-                    an ordered list of model metallicities. 
+        mass_dim : The coordinates in the mass dimension, i.e.,
+                    an ordered list of model masses.
+        z_dim : The coordinates in the Z dimension, i.e.,
+                    an ordered list of model metallicities.
         x_idx : Dictionary mapping elements to their index in the array
         lifetime : 2D array of model lifetimes
         mass_final : 2D array of final mass (e.g., pre-supernova, after winds)
         mass_remnant : 2D array of compact remnant mass (NS/BH/WD).
         x_cc : 3D array of ejecta chemical abundances (mass fractions) from CCSNe.
         x_wind : 3D array of ejecta chemical abundances (mass fractions) from winds (including AGB).
-        w_cc : 2D array of ejecta mass from CCSNe, as a fraction of total initial stellar mass       
-        w_wind : 2D array of ejecta mass from winds, as a fraction of total initial stellar mass       
+        w_cc : 2D array of ejecta mass from CCSNe, as a fraction of total initial stellar mass
+        w_wind : 2D array of ejecta mass from winds, as a fraction of total initial stellar mass
         mass_final_hn : 2D array of final mass (e.g., pre-supernova, after winds)
         mass_remnant_hn : 2D array of compact remnant mass (NS/BH/WD).
         x_hn : 3D array of ejecta chemical abundances (mass fractions) from HNe.
-        x_hn_wind : 3D array of ejecta chemical abundances (mass fractions) from winds (including AGB).
-        w_hn : 2D array of ejecta mass from HNe, as a fraction of total initial stellar mass       
-        w_hn_wind : 2D array of ejecta mass from winds, as a fraction of total initial stellar mass       
+        x_hn_wind : 3D array of ejecta chemical abundances (mass fractions) from winds (inc. AGB).
+        w_hn : 2D array of ejecta mass from HNe, as a fraction of total initial stellar mass
+        w_hn_wind : 2D array of ejecta mass from winds, as a fraction of total initial stellar mass
     """
-    include_hn = config.STELLAR_MODELS['include_hn']
+    include_hn = config.STELLAR_MODELS["include_hn"]
     elements_all = chem_elements.elements
     el2z = chem_elements.el2z
     # Include only the elements listed in the dataset.
     elements = list(set(models.columns).intersection(set(elements_all)))
     # Sort by charge number
-    elements.sort(key = lambda x : el2z[x])
+    elements.sort(key=lambda x: el2z[x])
     # Store the index for each element in the array.
-    x_idx = {el : int(i) for i,el in enumerate(elements)}
+    x_idx = {el: int(i) for i, el in enumerate(elements)}
     mass_dim = np.sort(models.mass.unique())
     z_dim = np.sort(models.Z.unique())
 
@@ -92,79 +94,81 @@ def fill_arrays(models):
         mass_final_hn = np.zeros((len(mass_dim), len(z_dim)))
         mass_remnant_hn = np.zeros((len(mass_dim), len(z_dim)))
 
-    for i,m in enumerate(mass_dim):
-        for j,z in enumerate(z_dim):
+    for i, m in enumerate(mass_dim):
+        for j, z in enumerate(z_dim):
             model = models[(models.mass == m) & (models.Z == z)]
             # TODO: move this to a process row function
             lifetime_ = model.lifetime.unique()
             if len(lifetime_) > 1:
-                raise ValueError(f"Trying to process \n"
-                            f"{model[['mass','Z','type','lifetime']]}\n"
-                            f"No functionality to deal with models of "
-                            f"different lifetimes at the same (m,z) co-ordinate.")
+                raise ValueError(
+                    f"Trying to process \n"
+                    f"{model[['mass','Z','type','lifetime']]}\n"
+                    f"No functionality to deal with models of "
+                    f"different lifetimes at the same (m,z) co-ordinate."
+                )
             else:
-                lifetime[i,j] = float(lifetime_)
+                lifetime[i, j] = float(lifetime_)
 
             # fill the arrays for each model type present at (m,z)
-            if 'cc' in list(model.type):
-                model_cc = model[model.type == 'cc']
-                x_cc[i,j,:] = np.array(model_cc[elements]).squeeze()
-                mass_final[i,j] = float(model_cc.mass_final)
-                mass_remnant[i,j] = float(model_cc.remnant_mass)
+            if "cc" in list(model.type):
+                model_cc = model[model.type == "cc"]
+                x_cc[i, j, :] = np.array(model_cc[elements]).squeeze()
+                mass_final[i, j] = float(model_cc.mass_final)
+                mass_remnant[i, j] = float(model_cc.remnant_mass)
             else:
-                x_cc[i,j,:] = 0.0
-                
-            if 'wind' in list(model.type):
-                model_w = model[model.type == 'wind']
-                x_wind[i,j,:] = np.array(model_w[elements]).squeeze()
-            elif 'agb' in list(model.type):
-                model_w = model[model.type == 'agb']
-                x_wind[i,j,:] = np.array(model_w[elements]).squeeze()
-                mass_final[i,j] = float(model_w.mass_final)
-                mass_remnant[i,j] = float(model_w.remnant_mass)
+                x_cc[i, j, :] = 0.0
+
+            if "wind" in list(model.type):
+                model_w = model[model.type == "wind"]
+                x_wind[i, j, :] = np.array(model_w[elements]).squeeze()
+            elif "agb" in list(model.type):
+                model_w = model[model.type == "agb"]
+                x_wind[i, j, :] = np.array(model_w[elements]).squeeze()
+                mass_final[i, j] = float(model_w.mass_final)
+                mass_remnant[i, j] = float(model_w.remnant_mass)
             else:
-                x_wind[i,j,:] = 0.0
+                x_wind[i, j, :] = 0.0
 
-            if include_hn == True:
-                if 'hn' in list(model.type):
-                    model_hn = model[model.type == 'hn']
-                    x_hn[i,j,:] = np.array(model_hn[elements]).squeeze()
-                    mass_final_hn[i,j] = float(model_hn.mass_final)
-                    mass_remnant_hn[i,j] = float(model_hn.remnant_mass)
+            if include_hn is True:
+                if "hn" in list(model.type):
+                    model_hn = model[model.type == "hn"]
+                    x_hn[i, j, :] = np.array(model_hn[elements]).squeeze()
+                    mass_final_hn[i, j] = float(model_hn.mass_final)
+                    mass_remnant_hn[i, j] = float(model_hn.remnant_mass)
                 else:
-                    x_hn[i,j,:] = 0.0
-                    mass_final_hn[i,j] = m
-                    mass_remnant_hn[i,j] = m
+                    x_hn[i, j, :] = 0.0
+                    mass_final_hn[i, j] = m
+                    mass_remnant_hn[i, j] = m
 
-                if 'hn_wind' in list(model.type):
-                    model_w = model[model.type == 'hn_wind']
-                    x_hn_wind[i,j,:] = np.array(model_w[elements]).squeeze()
+                if "hn_wind" in list(model.type):
+                    model_w = model[model.type == "hn_wind"]
+                    x_hn_wind[i, j, :] = np.array(model_w[elements]).squeeze()
                 else:
-                    x_hn_wind[i,j,:] = 0.0
+                    x_hn_wind[i, j, :] = 0.0
 
     w_cc = ((mass_final - mass_remnant).T / mass_dim).T
     w_wind = ((mass_dim - mass_final.T) / mass_dim).T
 
     arrays = {
-        'mass_dim' : mass_dim,
-        'z_dim' : z_dim,
-        'x_idx' : x_idx,
-        'lifetime' : lifetime,
-        'mass_final' : mass_final,
-        'mass_remnant' : mass_remnant,
-        'x_cc' : x_cc,
-        'x_wind' : x_wind,
-        'w_cc' : w_cc,
-        'w_wind' : w_wind,
+        "mass_dim": mass_dim,
+        "z_dim": z_dim,
+        "x_idx": x_idx,
+        "lifetime": lifetime,
+        "mass_final": mass_final,
+        "mass_remnant": mass_remnant,
+        "x_cc": x_cc,
+        "x_wind": x_wind,
+        "w_cc": w_cc,
+        "w_wind": w_wind,
     }
     if include_hn:
         w_hn = ((mass_final_hn - mass_remnant_hn).T / mass_dim).T
         w_hn_wind = ((mass_dim - mass_final_hn.T) / mass_dim).T
-        arrays['mass_final_hn'] = mass_final_hn
-        arrays['mass_remnant_hn'] = mass_remnant_hn
-        arrays['x_hn'] = x_hn
-        arrays['x_hn_wind'] = x_hn_wind
-        arrays['w_hn'] = w_hn
-        arrays['w_hn_wind'] = w_hn_wind
+        arrays["mass_final_hn"] = mass_final_hn
+        arrays["mass_remnant_hn"] = mass_remnant_hn
+        arrays["x_hn"] = x_hn
+        arrays["x_hn_wind"] = x_hn_wind
+        arrays["w_hn"] = w_hn
+        arrays["w_hn_wind"] = w_hn_wind
 
     return arrays
