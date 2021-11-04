@@ -3,6 +3,7 @@
 import numpy as np
 from scipy import interpolate
 from scipy.integrate import fixed_quad as f_quad_int
+from typing import Sequence, Dict, Type, Callable
 
 from .. import config
 from ..io import load_stellar_models
@@ -18,7 +19,129 @@ TOTAL_MASS = config.GALAXY_PARAMS["total_mass"]
 
 
 class Galaxy(object):
-    """ """
+    """A Galaxy object.
+
+    Attributes
+    ----------
+    include_hn: bool
+        True if HNe are to be included as a source of chemical enrichment. If False, 
+        only SNe will be included as a chemical end product for massive stars.
+    stellar_models: pd.DataFrame
+        The properties of stellar models and their end products to included in the evolution.
+    elements: Sequence[str]
+        The names of all elements included in the evolution.
+    mass_dim: Sequence[np.number]
+        The initial mass of each stellar model. Corresponds to the first axis of
+        each ndarray that contains properties of stellar models in mass-metallicity space.
+    z_dim: Sequence[np.number]
+        The metallicity of each stellar models. Corresponds to the second axis of
+        each ndarray that contains properties of stellar models in mass-metallicity space.
+    x_idx: Dict[str, int]
+        Each element and the corresponding index to use to access its abundance value.
+    lifetime: np.ndarray
+        The lifetime (years) of each stellar models in mass-metallicty space.
+    w_cc: np.ndarray
+        The total mass fraction of ejecta material from CCSNe in mass-metallicity space.
+        Given as the fraction of the initial stellar mass.
+    w_wind: np.ndarray
+        The total mass fraction of ejecta material from winds in mass-metallicity space.
+        Given as a fraction of the initial stellar mass.
+    x_cc: np.ndarray
+        The mass fraction of each element in the ejecta of CCSNe in mass-metallicity-element
+        space. Given as a fraction of the CCSNe ejecta mass.
+    x_wind: np.ndarray
+        The mass fraction of each element in the ejecta of winds in mass-metallicity-element
+        space. Given as a fraction of the wind ejecta mass.
+    w_hn: np.ndarray
+        The total mass fraction of ejecta material from HNe in mass-metallicity space.
+        Given as the fraction of the initial stellar mass.
+    w_hn_wind: np.ndarray
+        The total mass fraction of ejecta material from winds in mass-metallicity space.
+        Given as a fraction of the initial stellar mass.
+    x_hn: np.ndarray
+        The mass fraction of each element in the ejecta of HNe in mass-metallicity-element
+        space. Given as a fraction of the HNe ejecta mass.
+    x_hn_wind: np.ndarray
+        The mass fraction of each element in the ejecta of winds in mass-metallicity-element
+        space. Given as a fraction of the wind ejecta mass.
+    hn_frac: np.number
+        The fraction of massive stars destined to explode as HNe (i.e. a weighting factor to
+        combine HNe yields with CCSNe yields.) Must be between 0.0 and 1.0
+    min_mass_hn: np.number
+        The minimum (initial) mass of HNe models. E.g., if 20, then the chemical contribution of
+        stars with mass >= 20 will be a weighted average between HNe and SNe.
+    time: np.number
+        The age of the Galaxy in years.
+    z: np.number
+        The metallicity of the Galaxy.
+    gas_mass: np.number
+        The mass of gas within the Galaxy in solar masses
+    star_mass: np.number
+        The total mass of stars within the Galaxy in solar masses
+    galaxy_mass: np.number
+        The total mass of the Galaxy (i.e., gas_mass + star_mass).
+    sfr: np.number
+        The star formation rate in the Galaxy (solar masses / year)
+    infall_rate: np.number
+        The rate of gas falling into the Galaxy from a halo reservoir (solar masses / year)
+    x: Sequence[np.number]
+        The mass fractions of elements in the gas. The indices of elements can be found with x_idx.
+    infall_x: Sequence[np.number]
+        The mass fraction abundances of the material infalling from the halo. 
+    historical_z: np.ndarray
+        The time and metallicity for each previous timestep.
+    historical_sfr: np.ndarray
+        The time and SFR for each previous timestep.
+    imf: Type[IMF]
+        An IMF object containing information about the initial mass function of stars in the 
+        Galaxy. The IMF has been discretised over the stellar masses provided to the model.
+    lifetime_min: np.ndarray
+        The minimum lifetime for the representative range of each stellar models, in
+        mass-metallicity space. The IMF has been discretised over the stellar masses, so this
+        is the lifetime of a star at the upper mass range of each mass bin.
+    ia_model: pd.DataFrame
+        The chemical abundances ejected from the SNe Ia model to be included in the evolution.
+    x_ia: Sequence[np.number]
+        The chemical abundances ejected from the SNe Ia model to be included in the evolution.
+    mass_co: np.number
+        The mass of white dwarf (WD) exploding as a SNe Ia.
+    imf_donor_slope: np.number
+        The slope of the IMF representing donor stars in the SNe Ia system.
+    mdl_rg: np.number
+        The minimum initial mass of donor stars in red giant - white dwarf SNe Ia systems.
+    mdu_rg: np.number 
+        The maximum initial mass of donor stars in red giant - white dwarf SNe Ia systems.
+    mdl_ms: np.number 
+        The minimum initial mass of donor stars in main sequence - white dwarf SNe Ia systems.
+    mdu_ms: np.number
+        The maximum intial mass of donor stars in main sequence - white dwarf SNe Ia systems.
+    mpl: np.number
+        The minimum intiial mass of stars which may become white dwarves in SNe Ia systems.
+    mpu: np.number
+        The maximum intiial mass of stars which may become white dwarves in SNe Ia systems.
+    b_rg: np.number
+        The total fraction of red giant stars that end up in a SNe Ia system.
+    b_ms: np.number
+        The total fraction of main sequence stars that end up in a SNe Ia system.
+    masses_rg: Sequence[np.number]
+        A discrete list of red giant masses used to contruct an IMF for these stars.
+    imf_ia_rg: Type[IMF]
+        An IMF object representing the initial mass function of red giant stars within Ia systems.
+    masses_ms: Sequence[np.number]
+        A discrete list of main sequence masses used to contruct an IMF for these stars.
+    imf_ia_ms: Type[IMF]
+        An IMF object representing the initial mass function of main sequence stars within Ia
+        systems.
+    f_sfr: Callable
+        A function used to interpolate for the historical SFR at a given time.
+    f_z: Callable
+        A function used to interpolate for the historical metallicity at a given time.
+
+    Methods
+    -------
+    evolve(dt)
+        Evolves the Galaxy for a timestep of specified length `dt`.
+    """
 
     def __init__(self):
 
