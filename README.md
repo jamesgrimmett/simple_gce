@@ -1,6 +1,6 @@
 # simple_gce
 
-### Currently non-functional. The code was originally written to model a very specific system, I am in the process of re-structuring this code so that it can be applied more generally.
+### Work in Progress. When I originally wrote this program, I did not know very much about software development best practices. I am in the process of re-structuring the original code so that it is tidier, more robust, well-tested, and of a higher quality in general.
 
 A simple one-zone Galactic Chemical Evolution model, as used in [Grimmett et al. (2020)](https://arxiv.org/abs/1911.05901). 
 
