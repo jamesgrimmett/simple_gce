@@ -3,8 +3,9 @@
 """
 
 import os
+import pathlib
 
-INSTALL_DIR = "/Users/james/Documents/github_code/simple_gce"
+INSTALL_DIR = pathlib.Path(__file__).parent.parent.absolute()
 
 # Relevant filepaths
 FILEPATHS = {
