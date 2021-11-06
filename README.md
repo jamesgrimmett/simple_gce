@@ -10,29 +10,11 @@ For a complete description of the equations and assumptions, see [Grimmett et al
 
 I have tried to create a program that is both readable and efficient, but where I have had to choose between them, I will generally opt for readability. This is so that the user can more easily understand the code structure and implement the software for their own purpose with a confident understanding of the parameters and functioning.
 
-### Example Run
-```Python
-from simple_gce.gce import galaxy
+### Example Usage
+```
+conda env update -f environment.yml
+conda activate gce
+pip install -e .
 
-g = galaxy.Galaxy()
-
-steps = 10000
-gm = np.zeros(steps)
-sm = np.zeros(steps)
-t = np.zeros(steps)
-x_idx = g.x_idx
-zn = np.zeros(steps)
-fe = np.zeros(steps)
-h = np.zeros(steps)
-
-for i in range(steps):
-    g.evolve(dt=1.e6)
-    gm[i] = float(g.gas_mass)
-    sm[i] = float(g.star_mass)
-    h[i] = float(g.x[x_idx['H']])
-    fe[i] = float(g.x[x_idx['Fe']])
-    zn[i] = float(g.x[x_idx['Zn']])
-    t[i] = float(g.time)
-    if g.time%1.e8 == 0:
-        print(f'time: {g.time*1.e-9}')
+python -m simple_gce -t 13.e9 -o ./
 ```
