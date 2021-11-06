@@ -242,7 +242,7 @@ class Galaxy(object):
                 w_hn = w_hn[hn_mask]
                 w_hn_wind = w_hn_wind[hn_mask]
 
-                if not all(hn_mask is True):
+                if not all(hn_mask == True):
                     # total mass of stars of mass `m` born from the gas
                     mass_m = sfr_birth * imfdm
                     # ejecta mass from stars (core collacse/winds) for each mass range
