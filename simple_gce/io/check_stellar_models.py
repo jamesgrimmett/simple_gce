@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from .. import config
-from ..gce import approx_agb, approx_lifetime
+from ..gce import approx_winds, approx_lifetime
 from ..utils import chem_elements, error_handling
 
 # TODO:
@@ -136,7 +136,7 @@ def check_model_types(df):
         )
         warnings.warn(message)
 
-        df = approx_agb.fill_agb(df)
+        df = approx_winds.fill_agb(df)
 
     if config.STELLAR_MODELS["include_hn"] is True:
         if "hn" not in types:
