@@ -7,7 +7,7 @@ from scipy.integrate import fixed_quad as f_quad_int
 from .. import config
 from ..io import load_stellar_models
 from ..utils import chem_elements, error_handling
-from . import approx_agb, approx_lifetime, imf
+from . import approx_winds, approx_lifetime, imf
 
 el2z = chem_elements.el2z
 lt = approx_lifetime.ApproxLifetime()
@@ -154,22 +154,22 @@ class Galaxy(object):
         infall_rate = float(self.infall_rate)
         infall_x = self.infall_x.copy()
 
-        # fill the composition of AGB/wind models if they are to be approximated.
-        # this will recycle the composition of the ISM from the time of formation.
-        if np.isnan(x_wind[:, z_dim <= z]).any():
-            x_wind[:, z_dim <= z] = approx_agb.fill_composition(x_wind[:, z_dim <= z], z, x, x_idx)
-            self.x_wind = np.copy(x_wind)
-        x_wind[:, z_dim > z] = approx_agb.fill_composition(x_wind[:, z_dim > z], z, x, x_idx)
-
-        if self.include_hn:
-            if np.isnan(x_hn_wind[:, z_dim <= z]).any():
-                x_hn_wind[:, z_dim <= z] = approx_agb.fill_composition(
-                    x_hn_wind[:, z_dim <= z], z, x, x_idx
-                )
-                self.x_hn_wind = np.copy(x_hn_wind)
-            x_hn_wind[:, z_dim > z] = approx_agb.fill_composition(
-                x_hn_wind[:, z_dim > z], z, x, x_idx
+        if self.include_hn is False:
+            x_wind_update, x_wind = approx_winds.recycle_ism_composition(
+                x_wind, z_dim, z, x, x_idx, self.include_hn
             )
+            self.x_wind = x_wind_update
+        else:
+            (
+                x_wind_update,
+                x_wind,
+                x_hn_wind_update,
+                x_hn_wind,
+            ) = approx_winds.recycle_ism_composition(
+                x_wind, z_dim, z, x, x_idx, self.include_hn, x_hn_wind
+            )
+            self.x_wind = x_wind_update
+            self.x_hn_wind = x_hn_wind_update
 
         if not (lifetime_min[:, z_dim <= z] <= time).any():
             ej_cc = 0.0
@@ -200,6 +200,12 @@ class Galaxy(object):
             t_birth = (t_birth.T * weight.T).T.sum(axis=1)[mask]
             z_birth = (z_birth.T * weight.T).T.sum(axis=1)[mask]
 
+            if (lifetime_min > time).any():
+                # TODO: add checks for correctness of stellar models
+                raise error_handling.ProgramError(
+                    "Error in evolution. Stellar models are incorrect"
+                )
+
             if self.include_hn:
                 x_hn = (w_hn.T * x_hn.T).T
                 x_hn_wind = (w_hn_wind.T * x_hn_wind.T).T
@@ -207,14 +213,8 @@ class Galaxy(object):
                 w_hn_wind = (w_hn_wind.T * weight.T).T.sum(axis=1)[mask]
                 x_hn = (x_hn.T * weight.T).T.sum(axis=1)[mask]
                 x_hn_wind = (x_hn_wind.T * weight.T).T.sum(axis=1)[mask]
-            if (lifetime_min > time).any():
-                # TODO: add checks for correctness of stellar models
-                raise error_handling.ProgramError(
-                    "Error in evolution. Stellar models are incorrect"
-                )
 
             imfdm = imf.imfdm(mass_list=mass_dim)
-
             sfr_birth = self._get_historical_value("sfr", t_birth)
 
             if not self.include_hn:
