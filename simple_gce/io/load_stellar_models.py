@@ -1,6 +1,8 @@
 """
 Load stellar models from CSV file
 """
+from dataclasses import dataclass
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -45,32 +47,15 @@ def read_ia_csv():
     return df
 
 
-def fill_arrays(models):
-    """
-    Fill arrays in mass-Z space with model properties.
+def generate_stellarmodels_dataclass():
+    """Load stellar data CSV and use to generate a StellarModels dataclass."""
+    model_data = read_stellar_csv()
+    stellar_models = create_dataclass_from_df(model_data)
+    return stellar_models
 
-    Args:
-        models : Pandas dataframe of stellar models as described in ....
-    Returns: Dict
-        mass_dim : The coordinates in the mass dimension, i.e.,
-                    an ordered list of model masses.
-        z_dim : The coordinates in the Z dimension, i.e.,
-                    an ordered list of model metallicities.
-        x_idx : Dictionary mapping elements to their index in the array
-        lifetime : 2D array of model lifetimes
-        mass_final : 2D array of final mass (e.g., pre-supernova, after winds)
-        mass_remnant : 2D array of compact remnant mass (NS/BH/WD).
-        x_cc : 3D array of ejecta chemical abundances (mass fractions) from CCSNe.
-        x_wind : 3D array of ejecta chemical abundances (mass fractions) from winds (including AGB).
-        w_cc : 2D array of ejecta mass from CCSNe, as a fraction of total initial stellar mass
-        w_wind : 2D array of ejecta mass from winds, as a fraction of total initial stellar mass
-        mass_final_hn : 2D array of final mass (e.g., pre-supernova, after winds)
-        mass_remnant_hn : 2D array of compact remnant mass (NS/BH/WD).
-        x_hn : 3D array of ejecta chemical abundances (mass fractions) from HNe.
-        x_hn_wind : 3D array of ejecta chemical abundances (mass fractions) from winds (inc. AGB).
-        w_hn : 2D array of ejecta mass from HNe, as a fraction of total initial stellar mass
-        w_hn_wind : 2D array of ejecta mass from winds, as a fraction of total initial stellar mass
-    """
+
+def create_dataclass_from_df(models):
+    """Read dataframe to populate StellarModels attributes."""
     include_hn = config.STELLAR_MODELS["include_hn"]
     elements_all = chem_elements.elements
     el2z = chem_elements.el2z
@@ -93,6 +78,7 @@ def fill_arrays(models):
         x_hn_wind = np.zeros((len(mass_dim), len(z_dim), len(elements)))
         mass_final_hn = np.zeros((len(mass_dim), len(z_dim)))
         mass_remnant_hn = np.zeros((len(mass_dim), len(z_dim)))
+        min_mass_hn = models[models.type == "hn"].mass.min()
 
     for i, m in enumerate(mass_dim):
         for j, z in enumerate(z_dim):
@@ -148,27 +134,108 @@ def fill_arrays(models):
 
     w_cc = ((mass_final - mass_remnant).T / mass_dim).T
     w_wind = ((mass_dim - mass_final.T) / mass_dim).T
-
-    arrays = {
-        "mass_dim": mass_dim,
-        "z_dim": z_dim,
-        "x_idx": x_idx,
-        "lifetime": lifetime,
-        "mass_final": mass_final,
-        "mass_remnant": mass_remnant,
-        "x_cc": x_cc,
-        "x_wind": x_wind,
-        "w_cc": w_cc,
-        "w_wind": w_wind,
-    }
     if include_hn:
         w_hn = ((mass_final_hn - mass_remnant_hn).T / mass_dim).T
         w_hn_wind = ((mass_dim - mass_final_hn.T) / mass_dim).T
-        arrays["mass_final_hn"] = mass_final_hn
-        arrays["mass_remnant_hn"] = mass_remnant_hn
-        arrays["x_hn"] = x_hn
-        arrays["x_hn_wind"] = x_hn_wind
-        arrays["w_hn"] = w_hn
-        arrays["w_hn_wind"] = w_hn_wind
 
-    return arrays
+    if not include_hn:
+        stellar_models = StellarModels(
+            mass_dim=mass_dim,
+            z_dim=z_dim,
+            elements=elements,
+            x_idx=x_idx,
+            lifetime=lifetime,
+            mass_final=mass_final,
+            mass_remnant=mass_remnant,
+            x_cc=x_cc,
+            x_wind=x_wind,
+            w_cc=w_cc,
+            w_wind=w_wind,
+        )
+    else:
+        stellar_models = StellarModels(
+            mass_dim=mass_dim,
+            z_dim=z_dim,
+            elements=elements,
+            x_idx=x_idx,
+            lifetime=lifetime,
+            mass_final=mass_final,
+            mass_remnant=mass_remnant,
+            x_cc=x_cc,
+            x_wind=x_wind,
+            w_cc=w_cc,
+            w_wind=w_wind,
+            mass_final_hn=mass_final_hn,
+            mass_remnant_hn=mass_remnant_hn,
+            x_hn=x_hn,
+            x_hn_wind=x_hn_wind,
+            w_hn=w_hn,
+            w_hn_wind=w_hn_wind,
+            min_mass_hn=min_mass_hn,
+        )
+
+    return stellar_models
+
+
+@dataclass
+class StellarModels:
+    """Data representing the stellar models that drive the Galactic evolution.
+
+    Attributes
+    ----------
+    mass_dim: (M,) np.array[np.number]
+        An ordered list of model masses (ZAMS; solar mass).
+    z_dim: (Z,) np.array[np.number]
+        An ordered list of model metallicities.
+    elements: (E,) list[str]
+        The chemical elements included in the evolution.
+    x_idx: dict[str, int]
+        Dictionary mapping elements to their index in arrays containing chemical abundances.
+    lifetime: (M,Z) np.ndarray[float]
+        Main sequence lifetimes (years).
+    mass_final: (M,Z) np.ndarray[float]
+        Final mass, i.e., pre-supernova, after winds (solar mass).
+    mass_remnant: (M,Z) np.ndarray[float]
+        Mass of the compact remnant (NS/BH/WD; solar mass).
+    x_cc: (M,Z,E) np.ndarray[float]
+        Chemical abundances (mass fractions) in the ejecta of CCSNe.
+    x_wind: (M,Z,E) np.ndarray[float]
+        Chemical abundances (mass fractions) in the wind ejecta (including AGB).
+    w_cc: (M,Z) np.ndarray[float]
+        Total ejecta mass from CCSNe, as a fraction of total initial stellar mass.
+    w_wind: (M,Z) np.ndarray[float]
+        Total ejecta mass from winds, as a fraction of total initial stellar mass.
+    mass_final_hn: (M,Z) np.ndarray[float]
+        Final mass, i.e., pre-supernova, after winds (solar mass).
+    mass_remnant_hn: (M,Z) np.ndarray[float]
+        Mass of the compact remnant (NS/BH/WD; solar mass).
+    x_hn: (M,Z,E) np.ndarray[float]
+        Chemical abundances (mass fractions) in the ejecta of HNe.
+    x_hn_wind: (M,Z,E) np.ndarray[float]
+        Chemical abundances (mass fractions) in the wind ejecta (inc. AGB).
+    w_hn: (M,Z) np.ndarray[float]
+        Total ejecta mass from HNe, as a fraction of total initial stellar mass.
+    w_hn_wind: (M,Z) np.ndarray[float]
+        Total ejecta mass from winds, as a fraction of total initial stellar mass.
+    min_mass_hn: np.number
+        The minimum ZAMS mass of the included HNe models.
+    """
+
+    mass_dim: np.array
+    z_dim: np.array
+    elements: List[str]
+    x_idx: Dict[str, int]
+    lifetime: np.ndarray
+    mass_final: np.ndarray
+    mass_remnant: np.ndarray
+    x_cc: np.ndarray
+    x_wind: np.ndarray
+    w_cc: np.ndarray
+    w_wind: np.ndarray
+    mass_final_hn: np.ndarray = None
+    mass_remnant_hn: np.ndarray = None
+    x_hn: np.ndarray = None
+    x_hn_wind: np.ndarray = None
+    w_hn: np.ndarray = None
+    w_hn_wind: np.ndarray = None
+    min_mass_hn: np.number = None

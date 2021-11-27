@@ -1,5 +1,7 @@
 """Galaxy class object."""
 
+import copy
+
 import numpy as np
 from scipy import interpolate
 from scipy.integrate import fixed_quad as f_quad_int
@@ -7,7 +9,7 @@ from scipy.integrate import fixed_quad as f_quad_int
 from .. import config
 from ..io import load_stellar_models
 from ..utils import chem_elements, error_handling
-from . import approx_winds, approx_lifetime, imf
+from . import approx_lifetime, approx_winds, imf
 
 el2z = chem_elements.el2z
 lt = approx_lifetime.ApproxLifetime()
@@ -22,31 +24,11 @@ class Galaxy(object):
 
     def __init__(self):
 
-        self.include_hn = bool(config.STELLAR_MODELS["include_hn"])
         # Load the stellar model yields (CC, AGB, etc.)
-        stellar_models = load_stellar_models.read_stellar_csv()
+        stellar_models = load_stellar_models.generate_stellarmodels_dataclass()
         self.stellar_models = stellar_models
-        # Include only the elements listed in the dataset.
-        self.elements = list(set(stellar_models.columns).intersection(set(el2z.keys())))
-        # Sort by charge number
-        self.elements.sort(key=lambda x: el2z[x])
-        # Load stellar model arrays
-        arrays = load_stellar_models.fill_arrays(self.stellar_models)
-        self.mass_dim = arrays["mass_dim"]
-        self.z_dim = arrays["z_dim"]
-        self.x_idx = arrays["x_idx"]
-        self.lifetime = arrays["lifetime"]
-        self.w_cc = arrays["w_cc"]
-        self.w_wind = arrays["w_wind"]
-        self.x_cc = arrays["x_cc"]
-        self.x_wind = arrays["x_wind"]
-        if self.include_hn:
-            self.x_hn = arrays["x_hn"]
-            self.x_hn_wind = arrays["x_hn_wind"]
-            self.w_hn = arrays["w_hn"]
-            self.w_hn_wind = arrays["w_hn_wind"]
-            self.hn_frac = config.STELLAR_MODELS["hn_frac"]
-            self.min_mass_hn = stellar_models[stellar_models.type == "hn"].mass.min()
+        self.include_hn = bool(config.STELLAR_MODELS["include_hn"])
+        self.hn_frac = config.STELLAR_MODELS["hn_frac"]
 
         # Initialise variables (from config where appropriate).
         self.time = 0.0
@@ -57,7 +39,8 @@ class Galaxy(object):
         self.sfr = config.GALAXY_PARAMS["sfr_init"]
         self.infall_rate = self.calc_infall_rate(self.time)
         # The elemental mass fractions in the gas to evolve.
-        x = np.zeros(len(self.elements))
+        x = np.zeros(len(self.stellar_models.elements))
+        self.x_idx = self.stellar_models.x_idx
         x[self.x_idx["H"]] = float(config.GALAXY_PARAMS["h_init"])
         x[self.x_idx["He"]] = float(config.GALAXY_PARAMS["he_init"])
         self.x = x
@@ -68,7 +51,7 @@ class Galaxy(object):
         self.historical_z = np.array([[self.time, self.z]])
         self.historical_sfr = np.array([[self.time, self.sfr]])
         self.imf = imf.IMF(
-            masses=self.mass_dim,
+            masses=self.stellar_models.mass_dim,
             slope=config.IMF_PARAMS["slope"],
             mass_min=config.IMF_PARAMS["mass_min"],
             mass_max=config.IMF_PARAMS["mass_max"],
@@ -76,18 +59,18 @@ class Galaxy(object):
         # Use the minimum lifetime (maximum mass) for each discretised mass range
         self.lifetime_min = np.squeeze(
             [
-                [lt.lifetime(self.imf.mass_bins[i, 1], z) for z in self.z_dim]
-                for i, m in enumerate(self.mass_dim)
+                [lt.lifetime(self.imf.mass_bins[i, 1], z) for z in self.stellar_models.z_dim]
+                for i, m in enumerate(self.stellar_models.mass_dim)
             ]
         )
         # Initialise the Ia model parameters
         self.ia_model = load_stellar_models.read_ia_csv()
-        if not set(self.ia_model.columns).issubset(set(self.elements)):
+        if not set(self.ia_model.columns).issubset(set(self.stellar_models.elements)):
             raise error_handling.NotImplementedError(
                 "Composition of Ia ejecta must\
                      be a subset of the composition of stellar yields (CCSNe/winds)"
             )
-        x_ia = np.zeros(len(self.elements))
+        x_ia = np.zeros(len(self.stellar_models.elements))
         for el, idx in self.x_idx.items():
             if el in self.ia_model.columns:
                 x_ia[idx] = float(self.ia_model[el])
@@ -125,25 +108,14 @@ class Galaxy(object):
         """ """
 
         time = float(self.time)
-
-        # Use copies of mutable objects for each timestep, to avoid modifying
-        # the class attribute (e.g., when updating x_wind)
-        mass_dim = self.mass_dim.copy()
-        z_dim = self.z_dim.copy()
-        lifetime_min = self.lifetime_min.copy()
-        w_cc = self.w_cc.copy()
-        w_wind = self.w_wind.copy()
-        x_cc = self.x_cc.copy()
-        x_wind = self.x_wind.copy()
+        # Use a copy to avoid risk of modifying stellar model properties
+        stellar_models = copy.deepcopy(self.stellar_models)
         if self.include_hn:
-            x_hn = self.x_hn.copy()
-            x_hn_wind = self.x_hn_wind.copy()
-            w_hn = self.w_hn.copy()
-            w_hn_wind = self.w_hn_wind.copy()
             hn_frac = float(self.hn_frac)
         mass_co = float(self.mass_co)
         x_ia = self.x_ia.copy()
 
+        lifetime_min = self.lifetime_min
         imf = self.imf
         gas_mass = float(self.gas_mass)
         star_mass = float(self.star_mass)
@@ -156,9 +128,10 @@ class Galaxy(object):
 
         if self.include_hn is False:
             x_wind_update, x_wind = approx_winds.recycle_ism_composition(
-                x_wind, z_dim, z, x, x_idx, self.include_hn
+                stellar_models.x_wind, stellar_models.z_dim, z, x, x_idx, self.include_hn
             )
-            self.x_wind = x_wind_update
+            stellar_models.x_wind = x_wind
+            self.stellar_models.x_wind = x_wind_update
         else:
             (
                 x_wind_update,
@@ -166,12 +139,20 @@ class Galaxy(object):
                 x_hn_wind_update,
                 x_hn_wind,
             ) = approx_winds.recycle_ism_composition(
-                x_wind, z_dim, z, x, x_idx, self.include_hn, x_hn_wind
+                stellar_models.x_wind,
+                stellar_models.z_dim,
+                z,
+                x,
+                x_idx,
+                self.include_hn,
+                stellar_models.x_hn_wind,
             )
-            self.x_wind = x_wind_update
-            self.x_hn_wind = x_hn_wind_update
+            stellar_models.x_wind = x_wind
+            stellar_models.x_hn_wind = x_hn_wind
+            self.stellar_models.x_wind = x_wind_update
+            self.stellar_models.x_hn_wind = x_hn_wind_update
 
-        if not (lifetime_min[:, z_dim <= z] <= time).any():
+        if not (lifetime_min[:, stellar_models.z_dim <= z] <= time).any():
             ej_cc = 0.0
             ej_x_cc = np.zeros_like(x)
             ej_wind = 0.0
@@ -184,18 +165,18 @@ class Galaxy(object):
             z_birth = self._get_historical_value("z", t_birth)
             # Rescale ejecta mass fractions to be fraction of total initial stellar mass,
             # to simplify interpolation
-            x_cc = (w_cc.T * x_cc.T).T
-            x_wind = (w_wind.T * x_wind.T).T
+            stellar_models.x_cc = (stellar_models.w_cc.T * stellar_models.x_cc.T).T
+            stellar_models.x_wind = (stellar_models.w_wind.T * stellar_models.x_wind.T).T
 
             # Create a mask for the models with Z ~= Z_birth for each stellar mass
-            mask, weight = self._filter_stellar_models(z_birth, z_dim)
+            mask, weight = self._filter_stellar_models(z_birth, stellar_models.z_dim)
             # Filter the model arrays to include only those shedding mass
-            mass_dim = mass_dim[mask]
-            w_cc = (w_cc.T * weight.T).T.sum(axis=1)[mask]
-            w_wind = (w_wind.T * weight.T).T.sum(axis=1)[mask]
+            stellar_models.mass_dim = stellar_models.mass_dim[mask]
+            stellar_models.w_cc = (stellar_models.w_cc.T * weight.T).T.sum(axis=1)[mask]
+            stellar_models.w_wind = (stellar_models.w_wind.T * weight.T).T.sum(axis=1)[mask]
 
-            x_cc = (x_cc.T * weight.T).T.sum(axis=1)[mask]
-            x_wind = (x_wind.T * weight.T).T.sum(axis=1)[mask]
+            stellar_models.x_cc = (stellar_models.x_cc.T * weight.T).T.sum(axis=1)[mask]
+            stellar_models.x_wind = (stellar_models.x_wind.T * weight.T).T.sum(axis=1)[mask]
             lifetime_min = (lifetime_min.T * weight.T).T.sum(axis=1)[mask]
             t_birth = (t_birth.T * weight.T).T.sum(axis=1)[mask]
             z_birth = (z_birth.T * weight.T).T.sum(axis=1)[mask]
@@ -207,58 +188,66 @@ class Galaxy(object):
                 )
 
             if self.include_hn:
-                x_hn = (w_hn.T * x_hn.T).T
-                x_hn_wind = (w_hn_wind.T * x_hn_wind.T).T
-                w_hn = (w_hn.T * weight.T).T.sum(axis=1)[mask]
-                w_hn_wind = (w_hn_wind.T * weight.T).T.sum(axis=1)[mask]
-                x_hn = (x_hn.T * weight.T).T.sum(axis=1)[mask]
-                x_hn_wind = (x_hn_wind.T * weight.T).T.sum(axis=1)[mask]
+                stellar_models.x_hn = (stellar_models.w_hn.T * stellar_models.x_hn.T).T
+                stellar_models.x_hn_wind = (
+                    stellar_models.w_hn_wind.T * stellar_models.x_hn_wind.T
+                ).T
+                stellar_models.w_hn = (stellar_models.w_hn.T * weight.T).T.sum(axis=1)[mask]
+                stellar_models.w_hn_wind = (stellar_models.w_hn_wind.T * weight.T).T.sum(axis=1)[
+                    mask
+                ]
+                stellar_models.x_hn = (stellar_models.x_hn.T * weight.T).T.sum(axis=1)[mask]
+                stellar_models.x_hn_wind = (stellar_models.x_hn_wind.T * weight.T).T.sum(axis=1)[
+                    mask
+                ]
 
-            imfdm = imf.imfdm(mass_list=mass_dim)
+            imfdm = imf.imfdm(mass_list=stellar_models.mass_dim)
             sfr_birth = self._get_historical_value("sfr", t_birth)
 
             if not self.include_hn:
                 # total mass of stars of mass `m` born from the gas
                 mass_m = sfr_birth * imfdm
                 # mass ejected from stars (core collapse/winds) for each mass range
-                ej_cc_ = w_cc * mass_m
+                ej_cc_ = stellar_models.w_cc * mass_m
                 # total ejecta mass from massive stars (core collapse/winds)
                 ej_cc = ej_cc_.sum()
                 # ejecta mass (per element) from massive stars (core collapse/winds)
-                ej_x_cc = np.matmul(mass_m, x_cc)
+                ej_x_cc = np.matmul(mass_m, stellar_models.x_cc)
                 # ejecta mass from winds for each mass range
-                ej_wind_ = w_wind * mass_m
+                ej_wind_ = stellar_models.w_wind * mass_m
                 # total ejecta mass from winds
                 ej_wind = ej_wind_.sum()
                 # ejecta mass (per element) from winds
-                ej_x_wind = np.matmul(mass_m, x_wind)
+                ej_x_wind = np.matmul(mass_m, stellar_models.x_wind)
             else:
-                hn_mask = mass_dim >= self.min_mass_hn
+                hn_mask = stellar_models.mass_dim >= stellar_models.min_mass_hn
                 # TODO: Can the HN values be separated earlier?
-                ej_hn_ = w_hn[hn_mask] * sfr_birth[hn_mask] * imfdm[hn_mask]
-                ej_hn_wind_ = w_hn_wind[hn_mask] * sfr_birth[hn_mask] * imfdm[hn_mask]
-                x_hn = x_hn[hn_mask]
-                x_hn_wind = x_hn_wind[hn_mask]
-                w_hn = w_hn[hn_mask]
-                w_hn_wind = w_hn_wind[hn_mask]
+                ej_hn_ = stellar_models.w_hn[hn_mask] * sfr_birth[hn_mask] * imfdm[hn_mask]
+                ej_hn_wind_ = (
+                    stellar_models.w_hn_wind[hn_mask] * sfr_birth[hn_mask] * imfdm[hn_mask]
+                )
+                stellar_models.x_hn = stellar_models.x_hn[hn_mask]
+                stellar_models.x_hn_wind = stellar_models.x_hn_wind[hn_mask]
+                stellar_models.w_hn = stellar_models.w_hn[hn_mask]
+                stellar_models.w_hn_wind = stellar_models.w_hn_wind[hn_mask]
 
                 if not all(hn_mask == True):
                     # total mass of stars of mass `m` born from the gas
                     mass_m = sfr_birth * imfdm
                     # ejecta mass from stars (core collacse/winds) for each mass range
-                    ej_cc_1_ = w_cc[~hn_mask] * mass_m[~hn_mask]
-                    ej_cc_2_ = w_cc[hn_mask] * mass_m[hn_mask]
+                    ej_cc_1_ = stellar_models.w_cc[~hn_mask] * mass_m[~hn_mask]
+                    ej_cc_2_ = stellar_models.w_cc[hn_mask] * mass_m[hn_mask]
                     # total ejecta mass from massive stars (core collapse/winds)
                     ej_cc = ej_cc_1_.sum() + (1 - hn_frac) * ej_cc_2_.sum() + hn_frac * ej_hn_.sum()
                     # ejecta mass (per element) from massive stars (core collapse/winds)
                     ej_x_cc = (
-                        np.matmul(mass_m[~hn_mask], x_cc[~hn_mask])
-                        + (1 - hn_frac) * np.matmul(mass_m[hn_mask], x_cc[hn_mask])
-                        + hn_frac * np.matmul(mass_m[hn_mask], x_hn)
+                        np.matmul(mass_m[~hn_mask], stellar_models.x_cc[~hn_mask])
+                        + (1 - hn_frac) * np.matmul(mass_m[hn_mask], stellar_models.x_cc[hn_mask])
+                        + hn_frac * np.matmul(mass_m[hn_mask], stellar_models.x_hn)
                     )
                     # ejecta mass from winds for each mass range
-                    ej_wind_1_ = w_wind[~hn_mask] * mass_m[~hn_mask]
-                    ej_wind_2_ = w_wind[hn_mask] * mass_m[hn_mask]
+                    ej_wind_1_ = stellar_models.w_wind[~hn_mask] * mass_m[~hn_mask]
+                    ej_wind_2_ = stellar_models.w_wind[hn_mask] * mass_m[hn_mask]
                     # total ejecta mass from winds
                     ej_wind = (
                         ej_wind_1_.sum()
@@ -267,29 +256,31 @@ class Galaxy(object):
                     )
                     # ejecta mass (per element) from winds
                     ej_x_wind = (
-                        np.matmul(mass_m[~hn_mask], x_wind[~hn_mask])
-                        + (1 - hn_frac) * np.matmul(mass_m[hn_mask], x_wind[hn_mask])
-                        + hn_frac * np.matmul(mass_m[hn_mask], x_hn_wind)
+                        np.matmul(mass_m[~hn_mask], stellar_models.x_wind[~hn_mask])
+                        + (1 - hn_frac) * np.matmul(mass_m[hn_mask], stellar_models.x_wind[hn_mask])
+                        + hn_frac * np.matmul(mass_m[hn_mask], stellar_models.x_hn_wind)
                     )
                 else:
                     # ejecta mass from stars (core collapse/winds) for each mass range
-                    ej_cc_ = w_cc * sfr_birth * imfdm
+                    ej_cc_ = stellar_models.w_cc * sfr_birth * imfdm
                     # total ejecta mass from massive stars (core collapse/winds)
                     ej_cc = (1 - hn_frac) * ej_cc_.sum() + hn_frac * ej_hn_.sum()
                     # ejecta mass (per element) from massive stars (core collapse/winds)
                     ej_cc_ = sfr_birth * imfdm
                     ej_hn_ = sfr_birth[hn_mask] * imfdm[hn_mask]
-                    ej_x_cc = (1 - hn_frac) * np.matmul(ej_cc_, x_cc) + hn_frac * np.matmul(
-                        ej_hn_, x_hn
-                    )
+                    ej_x_cc = (1 - hn_frac) * np.matmul(
+                        ej_cc_, stellar_models.x_cc
+                    ) + hn_frac * np.matmul(ej_hn_, stellar_models.x_hn)
                     # ejecta mass from winds for each mass range
-                    ej_wind_ = w_wind * sfr_birth * imfdm
+                    ej_wind_ = stellar_models.w_wind * sfr_birth * imfdm
                     # total ejecta mass from winds
                     ej_wind = (1 - hn_frac) * ej_wind_.sum() + hn_frac * ej_hn_wind_.sum()
                     # ejecta mass (per element) from winds
                     ej_wind_ = sfr_birth * imfdm
                     ej_hn_wind_ = sfr_birth[hn_mask] * imfdm[hn_mask]
-                    ej_x_wind = np.matmul(ej_wind_, x_wind) + np.matmul(ej_hn_wind_, x_hn_wind)
+                    ej_x_wind = np.matmul(ej_wind_, stellar_models.x_wind) + np.matmul(
+                        ej_hn_wind_, stellar_models.x_hn_wind
+                    )
 
             # Ia
             # TODO: use fe from avg. stellar value rather than gas, then use fe_h >= -1.1
