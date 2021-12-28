@@ -9,7 +9,8 @@ import pandas as pd
 
 from .. import config
 from ..utils import chem_elements, error_handling
-from . import check_stellar_models
+from ..io import check_stellar_models
+from ..gce import imf
 
 
 def read_stellar_csv():
@@ -50,11 +51,18 @@ def read_ia_csv():
 def generate_stellarmodels_dataclass():
     """Load stellar data CSV and use to generate a StellarModels dataclass."""
     model_data = read_stellar_csv()
-    stellar_models = create_dataclass_from_df(model_data)
+    stellar_models = create_stellarmodels_dataclass_from_df(model_data)
     return stellar_models
 
 
-def create_dataclass_from_df(models):
+def generate_iasystem_dataclass():
+    """Load Ia data CSV and use to generate a IaSystem dataclass."""
+    model_data = read_ia_csv()
+    ia_system = create_iasystem_dataclass_from_df(model_data)
+    return ia_system
+
+
+def create_stellarmodels_dataclass_from_df(models):
     """Read dataframe to populate StellarModels attributes."""
     include_hn = config.STELLAR_MODELS["include_hn"]
     elements_all = chem_elements.elements
@@ -177,9 +185,69 @@ def create_dataclass_from_df(models):
     return stellar_models
 
 
+def create_iasystem_dataclass_from_df(model):
+    """Read dataframe to populate IaSystem attributes."""
+    elements_all = chem_elements.elements
+    el2z = chem_elements.el2z
+    # Include only the elements listed in the dataset.
+    elements = list(set(model.columns).intersection(set(elements_all)))
+    # Sort by charge number
+    elements.sort(key=lambda x: el2z[x])
+    # Store the index for each element in the array.
+    x_idx = {el: int(i) for i, el in enumerate(elements)}
+    x_ia = np.zeros(len(x_idx))
+    for el, idx in x_idx.items():
+        if el in model.columns:
+            x_ia[idx] = float(model[el])
+    mass_co = float(config.IA_PARAMS["mass_co"])
+    imf_donor_slope = float(config.IA_PARAMS["imf_donor_slope"])
+    mdl_rg = float(config.IA_PARAMS["mdl_rg"])
+    mdu_rg = float(config.IA_PARAMS["mdu_rg"])
+    mdl_ms = float(config.IA_PARAMS["mdl_ms"])
+    mdu_ms = float(config.IA_PARAMS["mdu_ms"])
+    mpl = float(config.IA_PARAMS["mpl"])
+    mpu = float(config.IA_PARAMS["mpu"])
+    b_rg = float(config.IA_PARAMS["b_rg"])
+    b_ms = float(config.IA_PARAMS["b_ms"])
+
+    masses_rg = np.arange(mdl_rg + 0.1, mdu_rg, 0.1)
+    imf_ia_rg = imf.IMF(
+        masses=masses_rg,
+        slope=imf_donor_slope,
+        mass_min=mdl_rg,
+        mass_max=mdu_rg,
+    )
+    masses_ms = np.arange(mdl_ms + 0.1, mdu_ms, 0.1)
+    imf_ia_ms = imf.IMF(
+        masses=masses_ms,
+        slope=imf_donor_slope,
+        mass_min=mdl_ms,
+        mass_max=mdu_ms,
+    )
+
+    ia_system = IaSystem(
+        x_ia=x_ia,
+        x_idx=x_idx,
+        mass_co=mass_co,
+        imf_donor_slope=imf_donor_slope,
+        mdl_rg=mdl_rg,
+        mdu_rg=mdu_rg,
+        mdl_ms=mdl_ms,
+        mdu_ms=mdu_ms,
+        mpl=mpl,
+        mpu=mpu,
+        b_rg=b_rg,
+        b_ms=b_ms,
+        imf_ia_rg=imf_ia_rg,
+        imf_ia_ms=imf_ia_ms,
+    )
+
+    return ia_system
+
+
 @dataclass
 class StellarModels:
-    """Data representing the stellar models that drive the Galactic evolution.
+    """Data representing the stellar models that contribute to the Galactic evolution.
 
     Attributes
     ----------
@@ -239,3 +307,55 @@ class StellarModels:
     w_hn: np.ndarray = None
     w_hn_wind: np.ndarray = None
     min_mass_hn: np.number = None
+
+
+@dataclass
+class IaSystem:
+    """Data representing the Ia systems that contribute to the Galactic evolution.
+
+    Attributes
+    ----------
+    x_ia: np.array[float]
+        Chemical abundances (mass fractions) in the ejecta of SNe Ia.
+    x_idx: dict[str, int]
+        Dictionary mapping elements to their index in arrays containing chemical abundances.
+    mass_co: float
+        The mass of the CO white dwarf (solar mass).
+    imf_donor_slope: float
+        Exponent of the IMF (phi_d(m) ~ m**-slope).
+    mdl_rg: float
+        Lower mass limit for red giants forming Ia systems.
+    mdu_rg: float
+        Upper mass limit for red giants forming Ia systems.
+    mdl_ms: float
+        Lower mass limit for main-sequence stars forming Ia systems.
+    mdu_ms: float
+        Upper mass limit for main-sequence stars forming Ia systems.
+    mpl: float
+        Lower mass limit of the progenitor stars forming WD's.
+    mpu: float
+        Upper mass limit of the progenitor stars forming WD's.
+    b_rg: float
+        Fraction of red giant stars that will form Ia systems.
+    b_ms: float
+        Fraction of main-sequence stars that will form Ia systems.
+    imf_ia_rg: IMF
+        The IMF representing the mass distribution of red giant stars.
+    imf_ia_ms: IMF
+        The IMF representing the mass distribution of main-sequence stars.
+    """
+
+    x_ia: np.array
+    x_idx: Dict[str, int]
+    mass_co: float
+    imf_donor_slope: float
+    mdl_rg: float
+    mdu_rg: float
+    mdl_ms: float
+    mdu_ms: float
+    mpl: float
+    mpu: float
+    b_rg: float
+    b_ms: float
+    imf_ia_rg: imf.IMF
+    imf_ia_ms: imf.IMF

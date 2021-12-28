@@ -5,15 +5,12 @@ from dataclasses import dataclass
 
 import numpy as np
 from scipy import interpolate
-from scipy.integrate import fixed_quad as f_quad_int
 
 from .. import config
 from ..io import load_stellar_models
-from ..utils import chem_elements, error_handling
-from . import approx_lifetime, approx_winds, imf
+from ..utils import error_handling
+from . import approx_winds, imf, ia_system
 
-el2z = chem_elements.el2z
-lt = approx_lifetime.ApproxLifetime()
 
 INFALL_TIMESCALE = config.GALAXY_PARAMS["infall_timescale"]
 SFR_TIMESCALE = config.GALAXY_PARAMS["sfr_timescale"]
@@ -57,50 +54,13 @@ class Galaxy(object):
             mass_min=config.IMF_PARAMS["mass_min"],
             mass_max=config.IMF_PARAMS["mass_max"],
         )
-        # Use the minimum lifetime (maximum mass) for each discretised mass range
-        self.lifetime_min = np.squeeze(
-            [
-                [lt.lifetime(self.imf.mass_bins[i, 1], z) for z in self.stellar_models.z_dim]
-                for i, m in enumerate(self.stellar_models.mass_dim)
-            ]
-        )
         # Initialise the Ia model parameters
-        self.ia_model = load_stellar_models.read_ia_csv()
-        if not set(self.ia_model.columns).issubset(set(self.stellar_models.elements)):
+        self.ia_system = load_stellar_models.generate_iasystem_dataclass()
+        if self.ia_system.x_idx != self.stellar_models.x_idx:
             raise error_handling.NotImplementedError(
-                "Composition of Ia ejecta must\
-                     be a subset of the composition of stellar yields (CCSNe/winds)"
+                "Elements included in Ia ejecta must be the same as "
+                "those in the stellar model yields (CCSNe/winds)."
             )
-        x_ia = np.zeros(len(self.stellar_models.elements))
-        for el, idx in self.x_idx.items():
-            if el in self.ia_model.columns:
-                x_ia[idx] = float(self.ia_model[el])
-        self.x_ia = x_ia
-        self.mass_co = float(config.IA_PARAMS["mass_co"])
-        self.imf_donor_slope = float(config.IA_PARAMS["imf_donor_slope"])
-        self.mdl_rg = float(config.IA_PARAMS["mdl_rg"])
-        self.mdu_rg = float(config.IA_PARAMS["mdu_rg"])
-        self.mdl_ms = float(config.IA_PARAMS["mdl_ms"])
-        self.mdu_ms = float(config.IA_PARAMS["mdu_ms"])
-        self.mpl = float(config.IA_PARAMS["mpl"])
-        self.mpu = float(config.IA_PARAMS["mpu"])
-        self.b_rg = float(config.IA_PARAMS["b_rg"])
-        self.b_ms = float(config.IA_PARAMS["b_ms"])
-
-        self.masses_rg = np.arange(self.mdl_rg + 0.1, self.mdu_rg, 0.1)
-        self.imf_ia_rg = imf.IMF(
-            masses=self.masses_rg,
-            slope=self.imf_donor_slope,
-            mass_min=self.mdl_rg,
-            mass_max=self.mdu_rg,
-        )
-        self.masses_ms = np.arange(self.mdl_ms + 0.1, self.mdu_ms, 0.1)
-        self.imf_ia_ms = imf.IMF(
-            masses=self.masses_ms,
-            slope=self.imf_donor_slope,
-            mass_min=self.mdl_ms,
-            mass_max=self.mdu_ms,
-        )
 
         self.f_sfr = lambda x: np.ones_like(x) * config.GALAXY_PARAMS["sfr_init"]
         self.f_z = lambda x: np.ones_like(x) * config.GALAXY_PARAMS["z_init"]
@@ -109,19 +69,18 @@ class Galaxy(object):
         """ """
 
         time = float(self.time)
-        # Use a copy to avoid risk of modifying stellar model properties
+        # Use a copy to avoid risk of permanently modifying stellar model properties
         stellar_models = copy.deepcopy(self.stellar_models)
 
-        lifetime_min = self.lifetime_min
         imf = self.imf
         gas_mass = float(self.gas_mass)
         star_mass = float(self.star_mass)
         z = float(self.z)
-        x_idx = self.x_idx.copy()
-        x = self.x.copy()
+        x_idx = self.x_idx
+        x = self.x
         sfr = float(self.sfr)
         infall_rate = float(self.infall_rate)
-        infall_x = self.infall_x.copy()
+        infall_x = self.infall_x
 
         if self.include_hn is False:
             (
@@ -146,7 +105,7 @@ class Galaxy(object):
                 stellar_models.x_hn_wind,
             )
 
-        if np.all(lifetime_min[:, stellar_models.z_dim <= z] > time):
+        if np.all(stellar_models.lifetime[:, stellar_models.z_dim <= z] > time):
             ejecta = self.EnrichmentSources(
                 ej_cc=0.0,
                 ej_x_cc=np.zeros_like(x),
@@ -157,7 +116,7 @@ class Galaxy(object):
             )
         else:
             # Time and metallicity at the point of formation for each stellar model
-            t_birth = time - lifetime_min
+            t_birth = time - stellar_models.lifetime
             z_birth = self._get_historical_value("z", t_birth)
 
             z_birth, t_birth, stellar_models = self._interpolate_between_model_metallicity(
@@ -237,82 +196,6 @@ class Galaxy(object):
         sfr = (1.0 / SFR_TIMESCALE) * gas_mass
 
         return sfr
-
-    def calc_ia_rate_fast(self):
-        """
-        ...
-        Accuracy is exchanged for speed in this function (fixed_quad and lt.mass_approx).
-        Should make calc_ia_rate_slow() and compare results every n timesteps
-        """
-
-        # approximate the turnoff mass
-        m_turnoff = lt.mass_approx(lifetime=self.time)
-        # Progenitor (WD) component
-        mpl = max(self.mpl, m_turnoff)
-        mpu = self.mpu
-        if mpl >= mpu:
-            rate_ia = 0.0
-            return rate_ia
-
-        progenitor_component = self.imf._integrate_mod(lower=mpl, upper=mpu)
-
-        # WD - RG scenario
-        mdl_rg = max(self.mdl_rg, m_turnoff)
-        mdu_rg = self.mdu_rg
-        b_rg = self.b_rg
-        if mdl_rg >= mdu_rg:
-            rate_rg = 0.0
-        else:
-            rate_rg_1 = b_rg * progenitor_component
-            rate_rg_2 = f_quad_int(
-                lambda x: self._ia_donor_integrand(x, type="rg"),
-                a=mdl_rg,
-                b=mdu_rg,
-                n=len(np.arange(mdl_rg, mdu_rg, 0.01)),
-            )[0]
-            rate_rg = rate_rg_1 * rate_rg_2
-
-        # WD - MS scenario
-        b_ms = self.b_ms
-        mdl_ms = max(self.mdl_ms, m_turnoff)
-        mdu_ms = self.mdu_ms
-        if (mdl_ms >= mdu_ms) or (mpl >= mpu):
-            rate_ms = 0.0
-        else:
-            rate_ms_1 = b_ms * progenitor_component
-            rate_ms_2 = f_quad_int(
-                lambda x: self._ia_donor_integrand(x, type="ms"),
-                a=mdl_ms,
-                b=mdu_ms,
-                n=len(np.arange(mdl_ms, mdu_ms, 0.01)),
-            )[0]
-            rate_ms = rate_ms_1 * rate_ms_2
-
-        rate_ia = rate_rg + rate_ms
-
-        if np.isnan(rate_ia):
-            raise RuntimeError("Error in calculation of Ia rate.")
-
-        return rate_ia
-
-    def _ia_donor_integrand(self, m, type):
-        """ """
-        if type == "rg":
-            imf_m = self.imf_ia_rg.functional_form(m)
-        elif type == "ms":
-            imf_m = self.imf_ia_ms.functional_form(m)
-        lifetime_m = lt.lifetime(mass=m, z=self.z)
-        t = self.time - lifetime_m
-        # TODO: sometimes slight difference between integration lower limit and
-        #       true turnoff mass. Need to investigate.
-        t = t.clip(min=0.0)
-        sfr_m = self._get_historical_value("sfr", t)
-
-        integrand = 1.0 / m * sfr_m * imf_m
-        if np.isnan(integrand).any():
-            raise RuntimeError("Error in calculation of Ia rate.")
-
-        return integrand
 
     def update_historical_sfr(self):  # ,t_min):
         """ """
@@ -520,12 +403,12 @@ class Galaxy(object):
         # TODO: use fe from avg. stellar value rather than gas, then use fe_h >= -1.1
         fe_h = np.log10(self.x[self.x_idx["Fe"]] / self.x[self.x_idx["H"]]) - -2.7519036043868
         if fe_h >= -1.0:
-            rate_ia = self.calc_ia_rate_fast()
+            rate_ia = ia_system.calc_ia_rate_fast(self)
         else:
             rate_ia = 0.0
 
-        ej_ia = self.mass_co * rate_ia
-        ej_x_ia = ej_ia * self.x_ia
+        ej_ia = self.ia_system.mass_co * rate_ia
+        ej_x_ia = ej_ia * self.ia_system.x_ia
 
         ejecta = self.EnrichmentSources(
             ej_x_cc=ej_x_cc,

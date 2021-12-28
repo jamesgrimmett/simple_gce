@@ -6,7 +6,8 @@ import pandas as pd
 
 from .. import config
 from ..gce import approx_winds, approx_lifetime
-from ..utils import chem_elements, error_handling
+from ..utils import error_handling
+from ..utils.chem_elements import el2z
 
 # TODO:
 # check mass limits provided in config.
@@ -16,8 +17,6 @@ from ..utils import chem_elements, error_handling
 
 # def check_ia(df):
 #   check consistency with config params
-
-el2z = chem_elements.el2z
 
 REQUIRED_COLUMNS = [
     "mass",  # ZAMS mass
@@ -63,8 +62,6 @@ def check_columns(df):
 
     # TODO:
     # - Approximate and fill remnant_mass, mass_presn, if missing.
-
-    el2z = chem_elements.el2z
 
     # Columns excluding required
     non_req_columns = set(df.columns).difference(set(REQUIRED_COLUMNS))
@@ -153,7 +150,7 @@ def check_model_types(df):
 
 def check_massfracs(df):
     """ """
-    elements = chem_elements.elements
+    elements = el2z.keys()
     elements = list(set(df.columns).intersection(set(elements)))
 
     check = df[elements].sum(axis=1)
@@ -232,7 +229,7 @@ def check_hn_models(df):
     and the sn masses would be extended to [10, 15, 20, 30, 40, 60].
     """
 
-    elements = chem_elements.elements
+    elements = el2z.keys()
     elements = list(set(df.columns).intersection(set(elements)))
 
     mass_hn = np.unique(df[df.type == "hn"].mass)

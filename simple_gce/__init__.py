@@ -32,7 +32,7 @@ def run_basic_evolution(args):
     tmax = args.tmax
     steps = int(np.ceil(tmax / dt))
     x_idx = g.x_idx
-    elements = g.elements
+    elements = g.stellar_models.elements
 
     results = {
         "time": np.zeros(steps),
