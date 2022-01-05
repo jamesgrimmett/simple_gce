@@ -9,7 +9,7 @@ from scipy import interpolate
 from .. import config
 from ..io import load_stellar_models
 from ..utils import error_handling
-from . import approx_winds, imf, ia_system
+from . import approx_winds, imf, ia_utils
 
 
 INFALL_TIMESCALE = config.GALAXY_PARAMS["infall_timescale"]
@@ -403,7 +403,7 @@ class Galaxy(object):
         # TODO: use fe from avg. stellar value rather than gas, then use fe_h >= -1.1
         fe_h = np.log10(self.x[self.x_idx["Fe"]] / self.x[self.x_idx["H"]]) - -2.7519036043868
         if fe_h >= -1.0:
-            rate_ia = ia_system.calc_ia_rate_fast(self)
+            rate_ia = ia_utils.calc_ia_rate_fast(self)
         else:
             rate_ia = 0.0
 
