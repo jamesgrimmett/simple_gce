@@ -13,7 +13,7 @@ from ..io import check_stellar_models
 from ..gce import imf
 
 
-def read_stellar_csv():
+def read_stellar_csv() -> pd.DataFrame:
     filepath = config.FILEPATHS["stellar_models"]
     df = pd.DataFrame()
 
@@ -26,7 +26,7 @@ def read_stellar_csv():
     return df
 
 
-def read_ia_csv():
+def read_ia_csv() -> pd.Series:
     filepath = config.FILEPATHS["ia_model"]
     df = pd.read_csv(filepath)
 
@@ -48,21 +48,21 @@ def read_ia_csv():
     return df
 
 
-def generate_stellarmodels_dataclass():
+def generate_stellarmodels_dataclass() -> dataclass:
     """Load stellar data CSV and use to generate a StellarModels dataclass."""
     model_data = read_stellar_csv()
     stellar_models = create_stellarmodels_dataclass_from_df(model_data)
     return stellar_models
 
 
-def generate_iasystem_dataclass():
+def generate_iasystem_dataclass() -> dataclass:
     """Load Ia data CSV and use to generate a IaSystem dataclass."""
     model_data = read_ia_csv()
     ia_system = create_iasystem_dataclass_from_df(model_data)
     return ia_system
 
 
-def create_stellarmodels_dataclass_from_df(models):
+def create_stellarmodels_dataclass_from_df(models: pd.DataFrame) -> dataclass:
     """Read dataframe to populate StellarModels attributes."""
     include_hn = config.STELLAR_MODELS["include_hn"]
     elements_all = chem_elements.elements
@@ -185,7 +185,7 @@ def create_stellarmodels_dataclass_from_df(models):
     return stellar_models
 
 
-def create_iasystem_dataclass_from_df(model):
+def create_iasystem_dataclass_from_df(model: pd.DataFrame) -> dataclass:
     """Read dataframe to populate IaSystem attributes."""
     elements_all = chem_elements.elements
     el2z = chem_elements.el2z

@@ -1,13 +1,13 @@
-"""Galaxy class object."""
-
 import copy
 from dataclasses import dataclass
+from typing import List, Tuple
 
 import numpy as np
 from scipy import interpolate
 
 from .. import config
 from ..io import load_stellar_models
+from ..io.load_stellar_models import StellarModels
 from ..utils import error_handling
 from . import approx_winds, imf, ia_utils
 
@@ -18,7 +18,53 @@ TOTAL_MASS = config.GALAXY_PARAMS["total_mass"]
 
 
 class Galaxy(object):
-    """ """
+    """The main Galaxy object.
+
+    This class contains all of the information needed to describe the Galaxy, and methods
+    for evolving the Galaxy through time. No arguments are required to create a Galaxy
+    object; all configurable parameters will be loaded from config.py
+
+    Attributes
+    ----------
+    stellar_models: StellarModels
+        A dataclass holding the properties of the stellar models existing in the Galaxy.
+    include_hn: bool
+        Whether or not hypernovae are included in the model.
+    hn_frac: float
+        The fraction of massive stars that explode as hypernovae (between 0.0 and 1.0).
+    time: float
+        The current time in the evolution, i.e., the age of the Galaxy in years.
+    z: float
+        The current metallicity of the Galaxy (sum of metal mass fractions).
+    gas_mass: float
+        The current mass of gas in the Galaxy in solar masses.
+    star_mass: float
+        The current total mass of stars in the Galaxy in solar masses.
+    galaxy_mass: float
+        The current total mass of the Galaxy in solar masses.
+    sfr: float
+        The current star formation rate in the Galaxy in solar masses per year.
+    infall_rate: float
+        The current rate of mass falling into the Galaxy in solar masses per year.
+    x: List[float]
+        The chemical composition of the gas in the Galaxy (mass fraction per element).
+    x_idx: Dict[str, int]
+        The index of each element in self.x
+    infall_x: List[float]
+        The chemical compsition of gas falling into the Galaxy.
+    historical_z: (N, 2) np.ndarray
+        The [time, metallicity] at each of N historical timesteps.
+    historical_sfr: (N, 2) np.ndarray
+        The [time, sfr] at each of N historical timesteps.
+    imf: IMF
+        An object describing the initial mass function of stars forming in the Galaxy.
+    ia_system: IaSystem
+        A dataclass holding the properties of Type Ia systems exisiting in the Galaxy.
+    f_sfr: Callable
+        An interpolation over self.historical_sfr to quickly get SFR for a given time.
+    f_z: Callable
+        An interpolation over self.historical_z to quickly get Z for a given time.
+    """
 
     def __init__(self):
 
@@ -65,8 +111,17 @@ class Galaxy(object):
         self.f_sfr = lambda x: np.ones_like(x) * config.GALAXY_PARAMS["sfr_init"]
         self.f_z = lambda x: np.ones_like(x) * config.GALAXY_PARAMS["z_init"]
 
-    def evolve(self, dt):
-        """ """
+    def evolve(self, dt: float):
+        """Evolve the Galaxy through a single timestep.
+
+        Calculates the rates of star formation, mass ejection from stars, and gas inflow,
+        and integrates the evolution of the Galaxy through a single timestep.
+
+        Parameters
+        ----------
+        dt: float
+            The size of the timestep in years.
+        """
 
         time = float(self.time)
         # Use a copy to avoid risk of permanently modifying stellar model properties
@@ -165,16 +220,12 @@ class Galaxy(object):
         self.update_historical_z()
 
     def update_infall_rate(self):
-        """ """
-
         time = self.time
         infall_rate = self.calc_infall_rate(time)
         self.infall_rate = infall_rate
 
     @staticmethod
-    def calc_infall_rate(time):
-        """ """
-
+    def calc_infall_rate(time: float) -> float:
         # infall_rate = 1.0 / INFALL_TIMESCALE * np.exp(-time / INFALL_TIMESCALE) * TOTAL_MASS
 
         infall_rate = (
@@ -184,25 +235,20 @@ class Galaxy(object):
         return infall_rate
 
     def update_sfr(self):
-        """ """
         gas_mass = self.gas_mass
         sfr = self.calc_sfr(gas_mass)
         self.sfr = sfr
 
     @staticmethod
-    def calc_sfr(gas_mass):
-        """ """
-
+    def calc_sfr(gas_mass: float) -> float:
         sfr = (1.0 / SFR_TIMESCALE) * gas_mass
 
         return sfr
 
-    def update_historical_sfr(self):  # ,t_min):
-        """ """
+    def update_historical_sfr(self):
         historical_sfr = self.historical_sfr
         t = self.time
         sfr = self.sfr
-        # historical_sfr = historical_sfr[historical_sfr[:,0] >= t_min]
         historical_sfr = np.append(historical_sfr, [[t, sfr]], axis=0)
         self.historical_sfr = historical_sfr
         self.f_sfr = interpolate.interp1d(
@@ -213,8 +259,7 @@ class Galaxy(object):
             fill_value=np.nan,
         )
 
-    def update_historical_z(self):  # ,t_min):
-        """ """
+    def update_historical_z(self):
         historical_z = self.historical_z
         t = self.time
         z = self.z
@@ -229,34 +274,62 @@ class Galaxy(object):
             fill_value=np.nan,
         )
 
-    def _get_historical_value(self, property, time_array):
+    def _get_historical_value(self, property: str, time_array: np.ndarray) -> np.ndarray:
         """
         Search array of historical values for values at specified time(s).
 
-        Args:
-            historical_array: 2D array of [time,value] evolution. Must be
-                orderder by time (ascending).
-            time_array: 2D array of time values for extraction from
-                historical datapoints.
-        Returns:
-            values: Values extracted from the historical array at the specified
-                times. Ordering matches the time_array provided.
+        Parameters
+        ----------
+        property: str
+            The property of the Galaxy to find historical values for. Must be one of
+            "sfr" or "z".
+        time_array: np.ndarray
+            An array of time values to extract historical values for.
+
+        Returns
+        -------
+        values: np.ndarray
+            Historical values of the property for each of the times specified.
         """
 
-        if property == "sfr":
-            f = self.f_sfr
-        elif property == "z":
-            f = self.f_z
+        valid_properties = {
+            "sfr": self.f_sfr,
+            "z": self.f_z,
+        }
+        if property not in valid_properties.keys():
+            return ValueError(
+                f"Invalid property ({property}) to extract historical "
+                f"values for. Must be one of {valid_properties.keys()}"
+            )
 
-        values = f(time_array)
+        values = valid_properties[property](time_array)
 
         return values
 
     @staticmethod
-    def _filter_stellar_models(z_birth, z_dim):
-        """
-        Choose the best fitting models to represent this timestep, and
-        calculating weighting factors to interpolate in between metallicities
+    def _filter_stellar_models(
+        z_birth: np.ndarray, z_dim: List[float]
+    ) -> Tuple[List[bool], np.ndarray]:
+        """Create a mask and weighting matrix to filter stellar models by metallicity.
+
+        For an array of metallicities at birth for each stellar model, create a mask and
+        weighting matrix used to interpolate between models of discrete metallicity.
+
+        Parameters
+        ----------
+        z_birth: (M, Z) np.ndarray
+            The metallicity at birth for each model of mass M and metallicity Z, where
+            the time of birth is the current time minus stellar lifetime.
+        z_dim: List[float]
+            The metallicity of each model along the second axis of the z_birth array.
+
+        Returns
+        -------
+        mask: List[Bool]
+            A boolean mask along the mass axis of the stellar models, to select models
+            with a lifetime less than the current time in the evolution.
+        weight: np.ndarray
+            The weight to apply to each model, to interpolate along the metallicity axis.
         """
 
         # TODO: consider interpolating in log-space
@@ -317,7 +390,39 @@ class Galaxy(object):
 
         return mask, weight
 
-    def _interpolate_between_model_metallicity(self, z_birth, t_birth, stellar_models):
+    def _interpolate_between_model_metallicity(
+        self, z_birth: np.ndarray, t_birth: np.ndarray, stellar_models: StellarModels
+    ) -> Tuple[List[float], List[float], StellarModels]:
+        """Reduce the stellar models to a single model per mass range.
+
+        For each mass in the mass axis; remove the row if the mass-dependent lifetime is
+        longer than the current time in evolution, otherwise, interpolate along the
+        metallicity axis to the metallicity at the time of birth.
+
+        Parameters
+        ----------
+        z_birth: (M, Z) np.ndarray
+            The metallicity of the Galaxy at the time of birth (based on the
+            mass-metallicity dependent lifetime) for each model.
+        t_birth: (M, Z) np.ndarray
+            The age of the Galaxy at the time of birth (based on the mass-metallicity
+            dependent lifetime) for each model.
+        stellar_models: StellarModels
+            A dataclass containing information that describes the stellar models.
+
+        Returns
+        -------
+        z_birth: List[float]
+            The metallicity of the Galaxy at the time of birth (based on the
+            mass-metallicity dependent lifetime) for each model. Reduced to
+            a single model per mass.
+        t_birth: List[float]
+            The age of the Galaxy at the time of birth (based on the mass-metallicity
+            dependent lifetime) for each model. Reduced to a single model per mass.
+        stellar_models: StellarModels
+            A dataclass containing the properties of the stellar models, reduced to only
+            include those which will be ejecting matter at the current timestep.
+        """
         # Rescale ejecta mass fractions to be fraction of total initial stellar mass,
         # to simplify interpolation
         stellar_models.x_cc = (stellar_models.w_cc.T * stellar_models.x_cc.T).T
@@ -345,7 +450,9 @@ class Galaxy(object):
 
         return z_birth, t_birth, stellar_models
 
-    def _calculate_enrichment_sources(self, sfr_birth, imfdm, stellar_models):
+    def _calculate_enrichment_sources(
+        self, sfr_birth: List[float], imfdm: List[float], stellar_models: StellarModels
+    ) -> dataclass:
         hn_frac = self.hn_frac
         if not self.include_hn:
             # total mass of stars of mass `m` born from the gas
@@ -450,7 +557,6 @@ class Galaxy(object):
         ej_ia: float
 
     def _conservation_checks(self):
-        """ """
         # TODO: add check for all(np.sum(x_cc + x_wind, axis = 1) == 1)
         if abs(np.sum(self.x) - 1.0) > 1.0e-8:
             raise error_handling.ProgramError("Error in evolution. SUM(X) != 1.0")

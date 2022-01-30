@@ -30,15 +30,18 @@ REQUIRED_COLUMNS = [
 OPTIONAL_COLUMNS = ["expl_energy"]
 
 
-def check_initial(df):
-    """
-    Call the relevant checks after loading the initial data.
+def check_initial(df: pd.DataFrame) -> pd.DataFrame:
+    """Call the relevant checks after loading the initial data.
 
-    Args:
-        df: dataframe containing stellar models.
+    Parameters
+    ----------
+    df: pd.DataFrame
+        Dataframe containing stellar models.
 
-    Returns:
-
+    Returns
+    -------
+    pd.DataFrame
+        The input dataframe with any modifications made during validation.
     """
     include_hn = config.STELLAR_MODELS["include_hn"]
 
@@ -54,7 +57,7 @@ def check_initial(df):
     return df
 
 
-def check_columns(df):
+def check_columns(df: pd.DataFrame):
     """
     Check that all of the necessary columns are present. Where possible, fill
     missing columns appropriately.
@@ -78,10 +81,8 @@ def check_columns(df):
         )
 
 
-def check_missing_vals(df):
-    """
-    Check that all required data is present.
-    """
+def check_missing_vals(df: pd.DataFrame) -> pd.DataFrame:
+    """Check that all required data is present."""
 
     if not df[df["mass_final"].isna()].empty:
         raise error_handling.InsufficientDataError(
@@ -107,9 +108,7 @@ def check_missing_vals(df):
     return df
 
 
-def check_model_types(df):
-    """ """
-
+def check_model_types(df: pd.DataFrame) -> pd.DataFrame:
     # Types may include core-collapse, asymptotic giant-branch, thermonuclear,
     # and hypernovae.
     known_types = ["cc", "agb", "hn", "cc_wind", "hn_wind"]
@@ -148,8 +147,7 @@ def check_model_types(df):
     return df
 
 
-def check_massfracs(df):
-    """ """
+def check_massfracs(df: pd.DataFrame) -> pd.DataFrame:
     elements = el2z.keys()
     elements = list(set(df.columns).intersection(set(elements)))
 
@@ -178,8 +176,7 @@ def check_massfracs(df):
     return df
 
 
-def check_mass_metallicity_consistent(df):
-    """ """
+def check_mass_metallicity_consistent(df: pd.DataFrame):
     z_list = df.Z.unique()
     m_list = df.mass.unique()
 
@@ -189,7 +186,7 @@ def check_mass_metallicity_consistent(df):
             raise error_handling.NotImplementedError()
 
 
-def check_wind_component(df):
+def check_wind_component(df: pd.DataFrame) -> pd.DataFrame:
     """
     Ensure that CC/HN models where mass != mass_final, that a row is added
     to store wind composition
@@ -216,7 +213,7 @@ def check_wind_component(df):
     return df
 
 
-def check_hn_models(df):
+def check_hn_models(df: pd.DataFrame) -> pd.DataFrame:
     """
     If HNe models are included, there masses must be either; (i) a subset
     of the SNe models, or, (ii) intersect with the upper end of SNe masses.

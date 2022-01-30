@@ -1,3 +1,8 @@
+"""A set of methods for calculate the rate of SNe Ia.
+
+See Eq. 12 of Kobayashi (2000) - https://arxiv.org/abs/astro-ph/9908005
+"""
+
 import numpy as np
 from scipy.integrate import fixed_quad as f_quad_int
 
@@ -7,11 +12,10 @@ from simple_gce.gce import approx_lifetime
 lt = approx_lifetime.ApproxLifetime()
 
 
-def calc_ia_rate_fast(galaxy):
-    """
-    ...
+def calc_ia_rate_fast(galaxy: object) -> float:
+    """Calculate the rate of SNe Ia occuring in the Galaxy.
+
     Accuracy is exchanged for speed in this function (fixed_quad and lt.mass_approx).
-    Should make calc_ia_rate_slow() and compare results every n timesteps
     """
     ia_system = galaxy.ia_system
     turnoff_mass = lt.mass_approx(lifetime=galaxy.time)
@@ -64,8 +68,11 @@ def calc_ia_rate_fast(galaxy):
     return rate_ia
 
 
-def _ia_donor_integrand(m, imf, galaxy):
-    """ """
+def _ia_donor_integrand(m: float, imf: float, galaxy: object) -> float:
+    """The integrand of the second intregal appearing in Eq. 12 of Kobayashi (2006).
+
+    See Eq. 12 of https://arxiv.org/abs/astro-ph/9908005
+    """
     imf_m = imf.functional_form(m)
     lifetime_m = lt.lifetime(mass=m, z=galaxy.z)
     t = galaxy.time - lifetime_m

@@ -1,6 +1,7 @@
 """Approximate stellar winds and AGB models."""
 
 import itertools
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -10,8 +11,8 @@ from ..utils import chem_elements
 from . import approx_lifetime
 
 
-def fill_agb(stellar_models):
-    """ """
+def fill_agb(stellar_models: pd.DataFrame) -> pd.DataFrame:
+    """Extend a set of stellar models to include approximate AGB models."""
 
     el2z = chem_elements.el2z
     mass_min_agb = 0.8  # solar masses, minimum stellar mass for AGB
@@ -50,7 +51,7 @@ def fill_agb(stellar_models):
     return stellar_models
 
 
-def fill_composition(ej_x_wind, z, x, x_idx):
+def fill_composition(ej_x_wind: np.ndarray, x: List[float], x_idx: Dict[str, int]) -> np.ndarray:
     """
     Set the composition of AGB/wind models where it is missing
     as the composition of the ISM with same metallicity.
@@ -66,7 +67,15 @@ def fill_composition(ej_x_wind, z, x, x_idx):
     return ej_x_wind
 
 
-def recycle_ism_composition(x_wind, z_dim, z, x, x_idx, include_hn, x_hn_wind=None):
+def recycle_ism_composition(
+    x_wind: np.ndarray,
+    z_dim: List[float],
+    z: float,
+    x: List[float],
+    x_idx: Dict[str, int],
+    include_hn: bool,
+    x_hn_wind: np.ndarray = None,
+) -> tuple:
     """Fill the composition of AGB/wind models if they are to be approximated.
 
     This will recycle the composition of the ISM from the time of formation.
@@ -106,18 +115,18 @@ def recycle_ism_composition(x_wind, z_dim, z, x, x_idx, include_hn, x_hn_wind=No
     """
     x_wind_update = np.copy(x_wind)
     if np.isnan(x_wind_update[:, z_dim <= z]).any():
-        x_wind_update[:, z_dim <= z] = fill_composition(x_wind_update[:, z_dim <= z], z, x, x_idx)
+        x_wind_update[:, z_dim <= z] = fill_composition(x_wind_update[:, z_dim <= z], x, x_idx)
     x_wind_tmp = np.copy(x_wind_update)
-    x_wind_tmp[:, z_dim > z] = fill_composition(x_wind_tmp[:, z_dim > z], z, x, x_idx)
+    x_wind_tmp[:, z_dim > z] = fill_composition(x_wind_tmp[:, z_dim > z], x, x_idx)
 
     if include_hn:
         x_hn_wind_update = np.copy(x_hn_wind)
         if np.isnan(x_hn_wind_update[:, z_dim <= z]).any():
             x_hn_wind_update[:, z_dim <= z] = fill_composition(
-                x_hn_wind_update[:, z_dim <= z], z, x, x_idx
+                x_hn_wind_update[:, z_dim <= z], x, x_idx
             )
         x_hn_wind_tmp = np.copy(x_hn_wind_update)
-        x_hn_wind_tmp[:, z_dim > z] = fill_composition(x_hn_wind_tmp[:, z_dim > z], z, x, x_idx)
+        x_hn_wind_tmp[:, z_dim > z] = fill_composition(x_hn_wind_tmp[:, z_dim > z], x, x_idx)
 
         return x_wind_update, x_wind_tmp, x_hn_wind_update, x_hn_wind_tmp
     else:

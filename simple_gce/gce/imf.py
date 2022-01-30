@@ -1,4 +1,5 @@
 """The initial mass function."""
+from typing import List, Union
 
 import numpy as np
 
@@ -7,30 +8,36 @@ from ..utils import error_handling
 
 
 class IMF(object):
-    """
-    Constructs a discretised IMF. For the specified masses, a normalised IMF
-    is instantiated, where each mass represents a section `dm` of the
-    continuous IMF.
-    Assumed to be of the form phi(m) = N * m **-p, where N is a normalisation
-    constant.
+    """Constructs a discretised IMF.
+
+    For the specified masses, a normalised IMF is instantiated, where each mass
+    represents a section `dm` of the continuous IMF. Assumed to be of the form
+    phi(m) = N * m **-p, where N is a normalisation constant.
+
+    Parameters
+    ----------
+    slope: float
+        The exponent of the IMF.
+    masses: List[float]
+        The list of masses to set the discretisation
+    mass_min: float, optional
+        The minimum mass existing in the distribution
+    mass_max: float, optional
+        The maximum mass existing in the distribution
 
     Attributes
     ----------
-    slope: numeric
-        The exponent of the IMF.
-    masses: Sequence[numeric]
-        The list of masses to set the discretisation
-    mass_min: numeric, optional
-        The minimum mass existing in the distribution
-    mass_max: numeric, optional
-        The maximum mass existing in the distribution
-
-    Methods
-    -------
-
+    mass_min_cc: float
+        The minimum stellar mass (ZAMS) that will end as a CCSNe.
+    imf_norm: float
+        The normalisation constant of the IMF.
+    mass_bins: (M, 2) np.ndarray
+        The mass range that each discrete stellar mass will represent.
     """
 
-    def __init__(self, slope, masses, mass_min=None, mass_max=None):
+    def __init__(
+        self, slope: float, masses: List[float], mass_min: float = None, mass_max: float = None
+    ):
         if mass_min is None:
             mass_min = config.IMF_PARAMS["mass_min"]
         if mass_max is None:
@@ -49,7 +56,7 @@ class IMF(object):
 
         self._validate_imf()
 
-    def functional_form(self, m):
+    def functional_form(self, m: float) -> float:
         """
         Returns the value of the IMF at the specified m
         """
@@ -57,7 +64,7 @@ class IMF(object):
 
         return result
 
-    def imfdm(self, mass_list):
+    def imfdm(self, mass_list: Union[float, List[float]]) -> Union[float, List[float]]:
         """ """
         try:
             iter(mass_list)
@@ -75,20 +82,19 @@ class IMF(object):
 
         return result
 
-    def integrate(self, lower, upper):
-        """
-        Integrates the IMF between the specified lower and upper values.
-        """
+    def integrate(self, lower: float, upper: float) -> float:
+        """Integrates the IMF between the specified lower and upper values."""
         imf_norm = self.imf_norm
         p = self.slope
         result = imf_norm / (1 - p) * (upper ** (1 - p) - lower ** (1 - p))
 
         return result
 
-    def _integrate_mod(self, lower, upper):
-        """
-        Integrates over 1/m * phi(m) dm. This is only called for integrating
-        over the Ia progenitor function when finding the Ia rate.
+    def _integrate_mod(self, lower: float, upper: float) -> float:
+        """Integrates over 1/m * phi(m) dm.
+
+        This is only called for integrating over the Ia progenitor function
+        when finding the Ia rate.
         """
 
         imf_norm = self.imf_norm
@@ -97,8 +103,7 @@ class IMF(object):
 
         return result
 
-    def _generate_mass_bins(self):
-        """ """
+    def _generate_mass_bins(self) -> np.ndarray:
         masses = self.masses
         mass_min = self.mass_min
         mass_max = self.mass_max
@@ -124,7 +129,6 @@ class IMF(object):
         return mass_bins
 
     def _validate_imf(self):
-        """ """
         check = 1.0 - np.sum(self.imfdm(mass_list=self.masses))
         if abs(check) >= 1.0e-5:
             raise error_handling.ProgramError(

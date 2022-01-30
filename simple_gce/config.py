@@ -39,7 +39,7 @@ IA_PARAMS = {
 
 STELLAR_MODELS = {
     "mass_min_cc": 10,  # solar masses, minimum stellar mass for CCSNe.
-    "include_hn": True,
+    "include_hn": True,  # should hypernova models be included?
     "hn_frac": 0.5,  # fraction of massive stars which explode as HNe.
 }
 
