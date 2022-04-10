@@ -8,7 +8,6 @@ from scipy.integrate import fixed_quad as f_quad_int
 
 from simple_gce.gce import approx_lifetime
 
-
 lt = approx_lifetime.ApproxLifetime()
 
 

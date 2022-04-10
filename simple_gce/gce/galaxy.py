@@ -9,8 +9,7 @@ from .. import config
 from ..io import load_stellar_models
 from ..io.load_stellar_models import StellarModels
 from ..utils import error_handling
-from . import approx_winds, imf, ia_utils
-
+from . import approx_winds, ia_utils, imf
 
 INFALL_TIMESCALE = config.GALAXY_PARAMS["infall_timescale"]
 SFR_TIMESCALE = config.GALAXY_PARAMS["sfr_timescale"]
@@ -72,7 +71,6 @@ class Galaxy(object):
         stellar_models = load_stellar_models.generate_stellarmodels_dataclass()
         self.stellar_models = stellar_models
         self.include_hn = bool(config.STELLAR_MODELS["include_hn"])
-        self.hn_frac = config.STELLAR_MODELS["hn_frac"]
 
         # Initialise variables (from config where appropriate).
         self.time = 0.0
@@ -82,6 +80,8 @@ class Galaxy(object):
         self.galaxy_mass = 0.0
         self.sfr = config.GALAXY_PARAMS["sfr_init"]
         self.infall_rate = self.calc_infall_rate(self.time)
+        self.hn_frac_init = config.GALAXY_PARAMS["hn_frac_init"]
+        self.hn_frac = config.GALAXY_PARAMS["hn_frac_init"]
         # The elemental mass fractions in the gas to evolve.
         x = np.zeros(len(self.stellar_models.elements))
         self.x_idx = self.stellar_models.x_idx
@@ -216,6 +216,7 @@ class Galaxy(object):
         self._conservation_checks()
         self.update_sfr()
         self.update_infall_rate()
+        self.update_hn_rate()
         self.update_historical_sfr()
         self.update_historical_z()
 
@@ -229,10 +230,18 @@ class Galaxy(object):
         # infall_rate = 1.0 / INFALL_TIMESCALE * np.exp(-time / INFALL_TIMESCALE) * TOTAL_MASS
 
         infall_rate = (
-            1.0 * (time / (INFALL_TIMESCALE ** 2)) * np.exp(-time / INFALL_TIMESCALE) * TOTAL_MASS
+            1.0 * (time / (INFALL_TIMESCALE**2)) * np.exp(-time / INFALL_TIMESCALE) * TOTAL_MASS
         )
 
         return infall_rate
+
+    def update_hn_rate(self):
+        hn_frac = self.calc_hn_rate(self.hn_frac_init, self.z)
+        self.hn_frac = hn_frac
+
+    @staticmethod
+    def calc_hn_rate(hn_frac_init: float, z_gas: float) -> float:
+        return max(0.001, hn_frac_init * np.exp(-z_gas / 0.001))
 
     def update_sfr(self):
         gas_mass = self.gas_mass

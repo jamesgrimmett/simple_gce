@@ -8,9 +8,9 @@ import numpy as np
 import pandas as pd
 
 from .. import config
-from ..utils import chem_elements, error_handling
-from ..io import check_stellar_models
 from ..gce import imf
+from ..io import check_stellar_models
+from ..utils import chem_elements, error_handling
 
 
 def read_stellar_csv() -> pd.DataFrame:

@@ -1,8 +1,9 @@
 __version__ = "0.1.0"
 
 import argparse
-import numpy as np
 import os
+
+import numpy as np
 import pandas as pd
 
 from simple_gce.gce import galaxy

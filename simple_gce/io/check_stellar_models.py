@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from .. import config
-from ..gce import approx_winds, approx_lifetime
+from ..gce import approx_lifetime, approx_winds
 from ..utils import error_handling
 from ..utils.chem_elements import el2z
 
@@ -159,10 +159,6 @@ def check_massfracs(df: pd.DataFrame) -> pd.DataFrame:
             f"Some stellar models have significant errors ({np.round(diff.max(), 3)}) "
             f"in sum(mass fractions)."
         )
-    if diff.max() >= 1.0e-2:
-        raise error_handling.ProgramError(
-            f"Large errors ({np.round(diff.max(), 3)}) in sum(mass fractions) for stellar models"
-        )
 
     # Allow scaling of mass fractions. Sometimes there are rounding errors in data tables, etc.
     scale = 1 / check
@@ -176,13 +172,13 @@ def check_massfracs(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def check_mass_metallicity_consistent(df: pd.DataFrame):
+def check_mass_metallicity_consistent(df: pd.DataFrame) -> None:
     z_list = df.Z.unique()
     m_list = df.mass.unique()
 
     for m in m_list:
         z_ = df[df.mass == m].Z.unique()
-        if set(z_) != set(z_list):
+        if sorted(z_) != sorted(z_list):
             raise error_handling.NotImplementedError()
 
 
@@ -248,8 +244,9 @@ def check_hn_models(df: pd.DataFrame) -> pd.DataFrame:
     # necessary, but do so anyway to be safe.
     if mass_max_sn < np.max(mass_hn):
         extend_sn = pd.DataFrame(df[(df.type == "hn") & (df.mass > mass_max_sn)])
-        extend_sn["mass_remnant"] = list(extend_sn.mass)
+        extend_sn["remnant_mass"] = list(extend_sn.mass)
         extend_sn["mass_final"] = list(extend_sn.mass)
+        extend_sn["type"] = "cc"
         extend_sn.loc[:, elements] = 0.0
         df = df.append(extend_sn, ignore_index=True)
 
