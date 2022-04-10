@@ -3,6 +3,7 @@ Load stellar models from CSV file
 """
 from dataclasses import dataclass
 from typing import Dict, List
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -14,6 +15,7 @@ from ..utils import chem_elements, error_handling
 
 
 def read_stellar_csv() -> pd.DataFrame:
+    """Reads a stellar model CSV from the filepath specified in config."""
     filepath = config.FILEPATHS["stellar_models"]
     df = pd.DataFrame()
 
@@ -27,24 +29,43 @@ def read_stellar_csv() -> pd.DataFrame:
 
 
 def read_ia_csv() -> pd.Series:
+    """Reads a SNe Ia model CSV from the filepath specified in config.
+
+    The composition of ejecta must sum to one, i.e. the composition must be provided in
+    mass fraction of the ejecta. If there is a small error (<=1.e-3), scaling will be
+    applied to ensure mass conservation during evolution.
+
+    Returns
+    -------
+    pd.DataFrame
+        The SNe Ia dataframe, with rescale chemical composition of there were small errors.
+
+    Raises
+    ------
+    ValueError: If there is a large error in sum(mass fractions)
+    """
+
     filepath = config.FILEPATHS["ia_model"]
     df = pd.read_csv(filepath)
 
     check = float(df.sum(axis="columns"))
     diff = abs(check - 1.0)
 
-    if diff > 1.0e-3:
-        raise error_handling.ProgramError("Ia yields do not sum to one.")
+    if diff <= 1.0e-3:
+        # Allow scaling of mass fractions. Sometimes there are rounding errors in data tables, etc.
+        scale = 1 / check
 
-    scale = 1 / check
-
-    df = df * scale
-
-    check2 = float(df.sum(axis="columns"))
-    diff2 = abs(check2 - 1.0)
-    if diff2 >= 1.0e-12:
-        raise error_handling.ProgramError("Unable to scale mass fractions.")
-
+        df = df * scale
+    elif diff <= 1.0e-2:
+        warnings.warn(
+            f"SNe Ia model has significant errors ({np.round(diff, 3)}) "
+            f"in sum(mass fractions). Evolution will likely fail to conserve mass."
+        )
+    else:
+        raise ValueError(
+            f"Large errors ({np.round(diff, 3)}) exist in "
+            f"sum(mass fractions) for Ia input data. Should sum to one."
+        )
     return df
 
 
