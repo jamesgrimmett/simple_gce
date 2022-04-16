@@ -11,15 +11,15 @@ INSTALL_DIR = pathlib.Path(__file__).parent.parent.absolute()
 FILEPATHS = {
     # Path to stellar models. Must be a list, even if singular.
     "stellar_models": [
-        os.path.join(INSTALL_DIR, "data/grimmett-2020/grimmett-2020_hn.csv"),
-        os.path.join(INSTALL_DIR, "data/grimmett-2020/GG-no_cutoff.claudia.csv"),
+        os.path.join(INSTALL_DIR, "data/kobayashi-2006/kobayashi-2006_sn_scaled.csv"),
+        os.path.join(INSTALL_DIR, "data/kobayashi-2006/kobayashi-2006_hn_scaled.csv"),
     ],
-    "ia_model": os.path.join(INSTALL_DIR, "data/grimmett-2020/kobayashi-2006_ia.csv"),
+    "ia_model": os.path.join(INSTALL_DIR, "data/kobayashi-2006/kobayashi-2006_ia_scaled.csv"),
 }
 
 IMF_PARAMS = {
     "mass_min": 0.05,  # solar masses, minimum stellar mass.
-    "mass_max": 100.0,  # solar masses, maximum stellar mass.
+    "mass_max": 50.0,  # solar masses, maximum stellar mass.
     "slope": 1.35,  # exponent of the IMF (phi(m) ~ m**-slope).
 }
 
@@ -39,7 +39,7 @@ IA_PARAMS = {
 
 STELLAR_MODELS = {
     "mass_min_cc": 10,  # solar masses, minimum stellar mass for CCSNe.
-    "include_hn": True,  # should hypernova models be included?
+    "include_hn": True,
 }
 
 GALAXY_PARAMS = {

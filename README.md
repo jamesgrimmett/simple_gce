@@ -1,22 +1,40 @@
 # `simpleGCE`
 
-## Work in Progress. 
-*When I originally wrote this program, I was still new to coding and did not know very much about software development best practices. The results were sound and carefully verified, but the code was messy. I am in the process of re-structuring the original code so that it is tidier, more robust, well-tested, properly documented, and of a higher quality in general.*
-
----
 A simple one-zone Galactic Chemical Evolution model, as used in [Grimmett et al. (2020)](https://arxiv.org/abs/1911.05901). 
 
 `simpleGCE` solves the set of differential equations that represent a simplified model for an evolving galaxy.
 This model allows for the infall of material from the Galactic halo (i.e. open box), and assumes homogeneous evolution (i.e. instantaneous mixing).
 For a complete description of the equations and assumptions, see [Grimmett et al. (2020)](https://arxiv.org/abs/1911.05901), and [Kobayashi et al. (2000)](https://arxiv.org/abs/astro-ph/9908005).
 
-I have tried to create a program that is both readable and efficient, but where I have had to choose between them, I will generally opt for readability. This is so that the user can more easily understand the code structure and implement the software for their own purpose with a confident understanding of the parameters and functioning.
+## Installation
 
-### Example Usage
+### From source
 ```
-conda env update -f environment.yml
-conda activate gce
-pip install -e .
+$ git clone https://github.com/jamesgrimmett/simple_gce.git /path/to/local/install
+$ cd /path/to/local/install
+$ pip install -e .
+```
 
-python -m simple_gce -t 13.e9 -o ./
+## Getting started
+### Environment setup
+Ensure that the package dependencies are installed within your local `python` environment. The easiest way to do this is to create a new conda environment, see the [anaconda docs](https://docs.conda.io/projects/conda/en/latest/index.html) if you have not used it before;
+```
+$ conda env update -f environment.yml
+$ conda activate gce
+```
+### Quick start
+To run with the example setup;
+```
+$ python -m simple_gce -t 13.e9 -o ./
+```
+For a description of the usage, type
+```
+$ python -m simple_gce --help
+```
+The output will be save in your current directory as a single `csv` file.
+
+To run a different example, copy another example config file and run again. E.g.,
+```
+$ cp simple_gce/example_configs/grimmett-2020_config.py simple_gce/config.py
+$ python -m simple_gce -t 13.e9 -o ./
 ```

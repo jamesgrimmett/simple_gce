@@ -11,7 +11,7 @@ import pandas as pd
 from .. import config
 from ..gce import imf
 from ..io import check_stellar_models
-from ..utils import chem_elements, error_handling
+from ..utils import chem_elements
 
 
 def read_stellar_csv() -> pd.DataFrame:

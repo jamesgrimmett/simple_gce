@@ -40,7 +40,6 @@ IA_PARAMS = {
 STELLAR_MODELS = {
     "mass_min_cc": 10,  # solar masses, minimum stellar mass for CCSNe.
     "include_hn": True,
-    "hn_frac": 0.5,  # fraction of massive stars which explode as HNe.
 }
 
 GALAXY_PARAMS = {
@@ -51,4 +50,5 @@ GALAXY_PARAMS = {
     "z_init": 0.0,  # metallicity
     "h_init": 0.7513,  # mass fraction, hydrogen initial.
     "he_init": 0.2487,  # mass fraction, helium initial.
+    "hn_frac_init": 0.5,  # fraction of massive stars which explode as HNe at Z=0.
 }

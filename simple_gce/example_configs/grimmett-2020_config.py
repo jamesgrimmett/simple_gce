@@ -1,5 +1,5 @@
-"""Configuration parameters to run a model similar to Kobayashi et al., (2006)
-    https://arxiv.org/abs/astro-ph/0608688
+"""Configuration parameters to run a model similar to Grimmett et al., (2020)
+    https://arxiv.org/abs/1911.05901
 """
 
 import os
