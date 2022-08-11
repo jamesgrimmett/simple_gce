@@ -2,7 +2,7 @@
 Load stellar models from CSV file
 """
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import warnings
 
 import numpy as np
@@ -17,11 +17,8 @@ from ..utils import chem_elements
 def read_stellar_csv() -> pd.DataFrame:
     """Reads a stellar model CSV from the filepath specified in config."""
     filepath = config.FILEPATHS["stellar_models"]
-    df = pd.DataFrame()
 
-    for fp in filepath:
-        df_ = pd.read_csv(fp)
-        df = pd.concat((df, df_))
+    df = pd.concat([pd.read_csv(fp) for fp in filepath])
 
     df = check_stellar_models.check_initial(df)
 
@@ -52,7 +49,7 @@ def read_ia_csv() -> pd.Series:
     diff = abs(check - 1.0)
 
     if diff <= 1.0e-3:
-        # Allow scaling of mass fractions. Sometimes there are rounding errors in data tables, etc.
+        # Allow scaling of mass fractions for small error.
         scale = 1 / check
 
         df = df * scale
@@ -86,12 +83,17 @@ def generate_iasystem_dataclass() -> dataclass:
 def create_stellarmodels_dataclass_from_df(models: pd.DataFrame) -> dataclass:
     """Read dataframe to populate StellarModels attributes."""
     include_hn = config.STELLAR_MODELS["include_hn"]
-    elements_all = chem_elements.elements
     el2z = chem_elements.el2z
     # Include only the elements listed in the dataset.
-    elements = list(set(models.columns).intersection(set(elements_all)))
-    # Sort by charge number
-    elements.sort(key=lambda x: el2z[x])
+    element_map = {
+        col: el
+        for col in models.columns
+        if (el := chem_elements.parse_chemical_symbol(col, silent=True)) is not None
+    }
+    elements = element_map.values()
+    models.rename(element_map, inplace=True)
+    # Sort by charge number and secondarily by mass number
+    elements.sort(key=lambda el: (el2z[el[0]], el[1]))
     # Store the index for each element in the array.
     x_idx = {el: int(i) for i, el in enumerate(elements)}
     mass_dim = np.sort(models.mass.unique())
@@ -208,12 +210,17 @@ def create_stellarmodels_dataclass_from_df(models: pd.DataFrame) -> dataclass:
 
 def create_iasystem_dataclass_from_df(model: pd.DataFrame) -> dataclass:
     """Read dataframe to populate IaSystem attributes."""
-    elements_all = chem_elements.elements
     el2z = chem_elements.el2z
     # Include only the elements listed in the dataset.
-    elements = list(set(model.columns).intersection(set(elements_all)))
-    # Sort by charge number
-    elements.sort(key=lambda x: el2z[x])
+    element_map = {
+        col: el
+        for col in model.columns
+        if (el := chem_elements.parse_chemical_symbol(col, silent=True)) is not None
+    }
+    elements = element_map.values()
+    model.rename(element_map, inplace=True)
+    # Sort by charge number and secondarily by mass number
+    elements.sort(key=lambda el: (el2z[el[0]], el[1]))
     # Store the index for each element in the array.
     x_idx = {el: int(i) for i, el in enumerate(elements)}
     x_ia = np.zeros(len(x_idx))
@@ -312,7 +319,7 @@ class StellarModels:
 
     mass_dim: np.array
     z_dim: np.array
-    elements: List[str]
+    elements: List[Tuple[str, int]]
     x_idx: Dict[str, int]
     lifetime: np.ndarray
     mass_final: np.ndarray

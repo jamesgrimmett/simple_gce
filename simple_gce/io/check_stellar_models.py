@@ -6,7 +6,7 @@ import pandas as pd
 
 from .. import config
 from ..gce import approx_lifetime, approx_winds
-from ..utils.chem_elements import el2z
+from ..utils.chem_elements import el2z, parse_chemical_symbol
 
 REQUIRED_COLUMNS = [
     "mass",  # ZAMS mass
@@ -68,7 +68,12 @@ def check_columns(df: pd.DataFrame) -> None:
     # Columns excluding required and optional
     remaining_columns = non_req_columns.difference(set(OPTIONAL_COLUMNS))
     # Columns excluding required, optional, and chemical elements
-    unknown_columns = remaining_columns.difference(set(el2z.keys()))
+    unknown_columns = []
+    for col in remaining_columns:
+        try:
+            _ = parse_chemical_symbol(col)
+        except ValueError:
+            unknown_columns.append(col)
     # Required columns that are missing
     missing_columns = list(set(REQUIRED_COLUMNS) - set(df.columns))
 

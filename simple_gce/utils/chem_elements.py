@@ -1,7 +1,32 @@
 """Chemical element utilities."""
+import re
 
-# TODO
-# - implement isotopes
+EL_NAME_PATTERN = re.compile(r"[A-Z][a-z]|[A-Z]")
+MASS_NUM_PATTERN = re.compile(r"[0-9]+")
+NON_ALPHANUM = re.compile(r"[^a-zA-Z0-9]")
+
+
+def parse_chemical_symbol(symbol: str, silent=False):
+    # Strip any non-alphanumeric symbols
+    s = re.sub(NON_ALPHANUM, "", symbol)
+    # Extract element name and mass number
+    el = EL_NAME_PATTERN.search(s)
+    mass_num = MASS_NUM_PATTERN.search(s)
+    if el is None or el.group() not in elements:
+        if silent:
+            return
+        else:
+            raise ValueError(
+                f"Unable to parse {symbol!s} as a chemical symbol. Labels for elements "
+                f"must contain the element name and optionally the mass number. The "
+                f"exact pattern is flexible and any non-alphanumeric characters will be "
+                f"ignored. E.g, 'He', 'He4', '4He', '^4He' are all acceptable inputs."
+            )
+    el = el.group()
+    if mass_num is not None:
+        mass_num = int(mass_num.group())
+    return el, mass_num
+
 
 el2z = {
     "H": 1,
