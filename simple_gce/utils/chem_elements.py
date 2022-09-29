@@ -1,18 +1,40 @@
 """Chemical element utilities."""
 import re
+from typing import Tuple
 
+EXCESS_LETTERS = re.compile(r"[A-z]{3}")
 EL_NAME_PATTERN = re.compile(r"[A-Z][a-z]|[A-Z]")
 MASS_NUM_PATTERN = re.compile(r"[0-9]+")
 NON_ALPHANUM = re.compile(r"[^a-zA-Z0-9]")
 
 
-def parse_chemical_symbol(symbol: str, silent=False):
+def parse_chemical_symbol(symbol: str, silent=False) -> Tuple[str, int]:
+    """Extracts element symbol and mass number from element label string.
+
+    For common label styles such as 'C12', 'C^12', '12C', etc., the element
+    `C` and mass number `12` will be extracted and returned.
+
+    Parameters
+    ----------
+    symbol: str
+        The raw element label.
+    silent: bool=False
+        Allow the function to fail silently if set to True.
+
+    Returns
+    -------
+    Tuple[str, int]:
+        el: The element symbol (e.g., `H`, `He`, `Li`, etc.)
+        mass_num: The mass number, if included. Otherwise set to None.
+    """
     # Strip any non-alphanumeric symbols
     s = re.sub(NON_ALPHANUM, "", symbol)
     # Extract element name and mass number
     el = EL_NAME_PATTERN.search(s)
     mass_num = MASS_NUM_PATTERN.search(s)
-    if el is None or el.group() not in elements:
+    # Ensure there are no more than 2 letters in a row
+    has_too_many_letters = EXCESS_LETTERS.search(s) is not None
+    if el is None or el.group() not in elements or has_too_many_letters:
         if silent:
             return
         else:
