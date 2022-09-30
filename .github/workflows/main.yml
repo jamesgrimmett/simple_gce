@@ -52,4 +52,4 @@ jobs:
         conda activate gce
         conda install -c conda-forge pytest
         pip install -e .
-        pytest
+        python -m pytest
