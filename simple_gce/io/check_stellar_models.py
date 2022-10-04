@@ -6,7 +6,7 @@ import pandas as pd
 
 from .. import config
 from ..gce import approx_lifetime, approx_winds
-from ..utils.chem_elements import el2z, parse_chemical_symbol
+from ..utils.chem_elements import parse_chemical_symbol
 
 REQUIRED_COLUMNS = [
     "mass",  # ZAMS mass
@@ -215,8 +215,9 @@ def check_massfracs(df: pd.DataFrame) -> pd.DataFrame:
     ------
     ValueError: If cc models are not present, or unknown models types are present.
     """
-    elements = el2z.keys()
-    elements = list(set(df.columns).intersection(set(elements)))
+    elements = [
+        col for col in df.columns if parse_chemical_symbol(col, silent=True) != (None, None)
+    ]
 
     check = df[elements].sum(axis=1)
     diff = abs(check - 1.0)
@@ -281,7 +282,9 @@ def check_wind_component(df: pd.DataFrame) -> pd.DataFrame:
     pd.DataFrame
         The input dataframe, with wind rows added if they were missing.
     """
-    elements = list(set(df.columns).intersection(set(el2z.keys())))
+    elements = [
+        col for col in df.columns if parse_chemical_symbol(col, silent=True) != (None, None)
+    ]
 
     for i, model in df[(df.type == "cc")].iterrows():
         if "wind" not in df[(df.mass == model.mass) & (df.Z == model.Z)].type:
@@ -332,8 +335,9 @@ def check_hn_models(df: pd.DataFrame) -> pd.DataFrame:
     ValueError: If cc models masses are incompatible with the hn model masses.
     """
 
-    elements = el2z.keys()
-    elements = list(set(df.columns).intersection(set(elements)))
+    elements = [
+        col for col in df.columns if parse_chemical_symbol(col, silent=True) != (None, None)
+    ]
 
     mass_hn = np.unique(df[df.type == "hn"].mass)
     mass_sn = np.unique(df[df.type == "cc"].mass)

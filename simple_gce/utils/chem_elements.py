@@ -1,6 +1,8 @@
 """Chemical element utilities."""
 import re
-from typing import Tuple
+from typing import Dict, List, Tuple
+
+import numpy as np
 
 EXCESS_LETTERS = re.compile(r"[A-z]{3}")
 EL_NAME_PATTERN = re.compile(r"[A-Z][a-z]|[A-Z]")
@@ -36,7 +38,7 @@ def parse_chemical_symbol(symbol: str, silent=False) -> Tuple[str, int]:
     has_too_many_letters = EXCESS_LETTERS.search(s) is not None
     if el is None or el.group() not in elements or has_too_many_letters:
         if silent:
-            return
+            el, mass_num = None, None
         else:
             raise ValueError(
                 f"Unable to parse {symbol!s} as a chemical symbol. Labels for elements "
@@ -44,10 +46,33 @@ def parse_chemical_symbol(symbol: str, silent=False) -> Tuple[str, int]:
                 f"exact pattern is flexible and any non-alphanumeric characters will be "
                 f"ignored. E.g, 'He', 'He4', '4He', '^4He' are all acceptable inputs."
             )
-    el = el.group()
-    if mass_num is not None:
-        mass_num = int(mass_num.group())
+    else:
+        el = el.group()
+        if mass_num is not None:
+            mass_num = int(mass_num.group())
     return el, mass_num
+
+
+def get_abundance_of_element(x: List[float], x_idx: Dict[Tuple, int], element: str) -> float:
+    """From a list of isotope abundances, get the total abundance of an element.
+
+    Parameters
+    ----------
+    x: List[float]
+        A list of chemical abundances
+    x_idx: Dict[Tuple, int]
+        A dictionary of the index for each isotope in `x`
+    element: str
+        The element to return the total abundance for
+
+    Returns
+    -------
+    float: The abundance of the specified element
+    """
+
+    el_abu = np.sum([x[i] for iso, i in x_idx.items() if iso[0] == element])
+
+    return el_abu
 
 
 el2z = {

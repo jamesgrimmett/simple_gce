@@ -51,4 +51,5 @@ GALAXY_PARAMS = {
     "h_init": 0.7513,  # mass fraction, hydrogen initial.
     "he_init": 0.2487,  # mass fraction, helium initial.
     "hn_frac_init": 0.5,  # fraction of massive stars which explode as HNe at Z=0.
+    "non_metals": ["H", "He", "Li", "Be", "B"],  # non-metal elements.
 }

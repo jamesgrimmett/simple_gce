@@ -9,6 +9,7 @@ from .. import config
 from ..io import load_stellar_models
 from ..io.load_stellar_models import StellarModels
 from ..utils import error_handling
+from ..utils.chem_elements import get_abundance_of_element
 from . import approx_winds, ia_utils, imf
 
 INFALL_TIMESCALE = config.GALAXY_PARAMS["infall_timescale"]
@@ -49,6 +50,8 @@ class Galaxy(object):
         The chemical composition of the gas in the Galaxy (mass fraction per element).
     x_idx: Dict[str, int]
         The index of each element in self.x
+    non_metal_idx: dict[Tuple, int]
+        Dictionary mapping non-metal elements to their index in self.x
     infall_x: List[float]
         The chemical compsition of gas falling into the Galaxy.
     historical_z: (N, 2) np.ndarray
@@ -85,8 +88,15 @@ class Galaxy(object):
         # The elemental mass fractions in the gas to evolve.
         x = np.zeros(len(self.stellar_models.elements))
         self.x_idx = self.stellar_models.x_idx
-        x[self.x_idx["H"]] = float(config.GALAXY_PARAMS["h_init"])
-        x[self.x_idx["He"]] = float(config.GALAXY_PARAMS["he_init"])
+        try:
+            x[self.x_idx[("H", None)]] = float(config.GALAXY_PARAMS["h_init"])
+        except KeyError:
+            x[self.x_idx[("H", 1)]] = float(config.GALAXY_PARAMS["h_init"])
+        try:
+            x[self.x_idx[("He", None)]] = float(config.GALAXY_PARAMS["he_init"])
+        except KeyError:
+            x[self.x_idx[("He", 4)]] = float(config.GALAXY_PARAMS["he_init"])
+        self.non_metal_idx = self.stellar_models.non_metal_idx
         self.x = x
         self.infall_x = np.array(x)
         # Store the evolution of metallicity and SFR in memory. The historical
@@ -202,14 +212,7 @@ class Galaxy(object):
         if any(np.isnan(x)):
             raise RuntimeError("Error in evolution. NaNs in the chemical abundances in the gas.")
         self.x = x
-        self.z = (
-            np.sum(x)
-            - x[x_idx["H"]]
-            - x[x_idx["He"]]
-            - x[x_idx["Li"]]
-            - x[x_idx["Be"]]
-            - x[x_idx["B"]]
-        )
+        self.z = np.sum([xi for i, xi in enumerate(x) if i not in self.non_metal_idx.values()])
 
         self.time = time + dt
 
@@ -517,7 +520,9 @@ class Galaxy(object):
 
         # Ia
         # TODO: use fe from avg. stellar value rather than gas, then use fe_h >= -1.1
-        fe_h = np.log10(self.x[self.x_idx["Fe"]] / self.x[self.x_idx["H"]]) - -2.7519036043868
+        fe_abu = get_abundance_of_element(x=self.x, x_idx=self.x_idx, element="Fe")
+        h_abu = get_abundance_of_element(x=self.x, x_idx=self.x_idx, element="H")
+        fe_h = np.log10(fe_abu / h_abu) - -2.7519036043868
         if fe_h >= -1.0:
             rate_ia = ia_utils.calc_ia_rate_fast(self)
         else:

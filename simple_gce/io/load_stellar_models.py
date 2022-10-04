@@ -1,9 +1,9 @@
 """
 Load stellar models from CSV file
 """
+import warnings
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
-import warnings
 
 import numpy as np
 import pandas as pd
@@ -83,19 +83,21 @@ def generate_iasystem_dataclass() -> dataclass:
 def create_stellarmodels_dataclass_from_df(models: pd.DataFrame) -> dataclass:
     """Read dataframe to populate StellarModels attributes."""
     include_hn = config.STELLAR_MODELS["include_hn"]
+    non_metals = config.GALAXY_PARAMS["non_metals"]
     el2z = chem_elements.el2z
     # Include only the elements listed in the dataset.
     element_map = {
         col: el
         for col in models.columns
-        if (el := chem_elements.parse_chemical_symbol(col, silent=True)) is not None
+        if (el := chem_elements.parse_chemical_symbol(col, silent=True)) != (None, None)
     }
-    elements = element_map.values()
-    models.rename(element_map, inplace=True)
+    elements = list(element_map.values())
+    models.rename(columns=element_map, inplace=True)
     # Sort by charge number and secondarily by mass number
     elements.sort(key=lambda el: (el2z[el[0]], el[1]))
-    # Store the index for each element in the array.
+    # Store the index for each element in the array, and record the non-metals.
     x_idx = {el: int(i) for i, el in enumerate(elements)}
+    non_metal_idx = {el: int(i) for i, el in enumerate(elements) if el[0] in non_metals}
     mass_dim = np.sort(models.mass.unique())
     z_dim = np.sort(models.Z.unique())
 
@@ -175,6 +177,7 @@ def create_stellarmodels_dataclass_from_df(models: pd.DataFrame) -> dataclass:
             z_dim=z_dim,
             elements=elements,
             x_idx=x_idx,
+            non_metal_idx=non_metal_idx,
             lifetime=lifetime,
             mass_final=mass_final,
             mass_remnant=mass_remnant,
@@ -189,6 +192,7 @@ def create_stellarmodels_dataclass_from_df(models: pd.DataFrame) -> dataclass:
             z_dim=z_dim,
             elements=elements,
             x_idx=x_idx,
+            non_metal_idx=non_metal_idx,
             lifetime=lifetime,
             mass_final=mass_final,
             mass_remnant=mass_remnant,
@@ -215,10 +219,10 @@ def create_iasystem_dataclass_from_df(model: pd.DataFrame) -> dataclass:
     element_map = {
         col: el
         for col in model.columns
-        if (el := chem_elements.parse_chemical_symbol(col, silent=True)) is not None
+        if (el := chem_elements.parse_chemical_symbol(col, silent=True)) != (None, None)
     }
-    elements = element_map.values()
-    model.rename(element_map, inplace=True)
+    elements = list(element_map.values())
+    model.rename(columns=element_map, inplace=True)
     # Sort by charge number and secondarily by mass number
     elements.sort(key=lambda el: (el2z[el[0]], el[1]))
     # Store the index for each element in the array.
@@ -285,8 +289,10 @@ class StellarModels:
         An ordered list of model metallicities.
     elements: (E,) list[str]
         The chemical elements included in the evolution.
-    x_idx: dict[str, int]
+    x_idx: dict[Tuple, int]
         Dictionary mapping elements to their index in arrays containing chemical abundances.
+    non_metal_idx: dict[Tuple, int]
+        Dictionary mapping non-metal elements to their index.
     lifetime: (M,Z) np.ndarray[float]
         Main sequence lifetimes (years).
     mass_final: (M,Z) np.ndarray[float]
@@ -320,7 +326,8 @@ class StellarModels:
     mass_dim: np.array
     z_dim: np.array
     elements: List[Tuple[str, int]]
-    x_idx: Dict[str, int]
+    x_idx: Dict[Tuple, int]
+    non_metal_idx: Dict[Tuple, int]
     lifetime: np.ndarray
     mass_final: np.ndarray
     mass_remnant: np.ndarray
@@ -345,7 +352,7 @@ class IaSystem:
     ----------
     x_ia: np.array[float]
         Chemical abundances (mass fractions) in the ejecta of SNe Ia.
-    x_idx: dict[str, int]
+    x_idx: dict[Tuple, int]
         Dictionary mapping elements to their index in arrays containing chemical abundances.
     mass_co: float
         The mass of the CO white dwarf (solar mass).

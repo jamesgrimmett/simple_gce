@@ -57,4 +57,7 @@ def run_basic_evolution(args):
         if g.time % 1.0e8 == 0:
             print(f"time: {g.time*1.e-9}")
 
-    pd.DataFrame(results).to_csv(output_file)
+    results_df = pd.DataFrame(results)
+    rename_cols = {el: "".join(map(str, filter(None, el))) for el in elements}
+    results_df.rename(columns=rename_cols, inplace=True)
+    results_df.to_csv(output_file)
