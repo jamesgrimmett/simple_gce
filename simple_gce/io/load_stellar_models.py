@@ -45,12 +45,23 @@ def read_ia_csv() -> pd.Series:
     filepath = config.FILEPATHS["ia_model"]
     df = pd.read_csv(filepath)
 
-    check = float(df.sum(axis="columns"))
-    diff = abs(check - 1.0)
+    sum_ejecta = float(df.sum(axis="columns"))
+    ia_total_mass = config.IA_PARAMS["mass_co"]
+
+    if abs(1.0 - sum_ejecta / ia_total_mass) <= 1.e-2:
+        warnings.warn(
+            "It appears that Ia ejecta composition has been supplied in units of "
+            "absolute mass. Rescaling to mass fraction."
+        )
+        scale = 1 / ia_total_mass
+        df = df * scale
+        sum_ejecta = float(df.sum(axis="columns"))
+
+    diff = abs(sum_ejecta - 1.0)
 
     if diff <= 1.0e-3:
         # Allow scaling of mass fractions for small error.
-        scale = 1 / check
+        scale = 1 / sum_ejecta
 
         df = df * scale
     elif diff <= 1.0e-2:

@@ -9,12 +9,12 @@ from ..gce import approx_lifetime, approx_winds
 from ..utils.chem_elements import parse_chemical_symbol
 
 REQUIRED_COLUMNS = [
-    "mass",  # ZAMS mass
-    "mass_final",  # Final mass (e.g. presupernova, after wind-loss)
-    "type",  # CC, AGB, Ia
-    "remnant_mass",  # Mass of the compact remnant.
-    "Z",  # Initial metallicity
-    "lifetime",  # Stellar lifetime.
+    "mass",         # ZAMS mass
+    "mass_final",   # Final mass (e.g. presupernova, after wind-loss)
+    "type",         # CC, AGB, Ia
+    "remnant_mass", # Mass of the compact remnant.
+    "Z",            # Initial metallicity
+    "lifetime",     # Stellar lifetime.
 ]
 
 OPTIONAL_COLUMNS = ["expl_energy"]
@@ -199,7 +199,8 @@ def check_massfracs(df: pd.DataFrame) -> pd.DataFrame:
     """
     The composition of ejecta must sum to one, i.e. the composition must be provided in
     mass fraction of the ejecta. If there is a small error (<=1.e-3), scaling will be
-    applied to ensure mass conservation during evolution.
+    applied to ensure mass conservation during evolution. If ejecta composition is given
+    in units of abolute mass (e.g. solar masses), it will be rescaled to mass fraction.
 
     Parameters
     ----------
@@ -213,21 +214,31 @@ def check_massfracs(df: pd.DataFrame) -> pd.DataFrame:
 
     Raises
     ------
-    ValueError: If cc models are not present, or unknown models types are present.
+    ValueError: If ejecta compositions do not sum to ~1.0.
     """
     elements = [
         col for col in df.columns if parse_chemical_symbol(col, silent=True) != (None, None)
     ]
 
-    check = df[elements].sum(axis=1)
-    diff = abs(check - 1.0)
+    sum_ejecta = df[elements].sum(axis=1)
+    total_ejecta_mass = df.mass_final - df.remnant_mass
 
-    if diff.max() <= 1.0e-3:
-        # Allow scaling of mass fractions. Sometimes there are rounding errors in data tables, etc.
-        scale = 1 / check
-
+    if all(abs(1.0 - sum_ejecta / total_ejecta_mass) <= 1.e-2):
+        warnings.warn(
+            "It appears that ejecta composition has been supplied in units of absolute "
+            "mass. Rescaling to mass fractions."
+        )
+        scale = 1 / total_ejecta_mass
         df.loc[:, elements] = df[elements].mul(scale, axis="rows")
-    elif diff.max() <= 1.0e-2:
+        sum_ejecta = df[elements].sum(axis=1)
+
+    diff = abs(sum_ejecta - 1.0)
+
+    if all(diff <= 1.0e-3):
+        # Allow scaling of mass fractions. Sometimes there are rounding errors in data tables, etc.
+        scale = 1 / sum_ejecta
+        df.loc[:, elements] = df[elements].mul(scale, axis="rows")
+    elif all(diff <= 1.0e-2):
         warnings.warn(
             f"Some stellar models have significant errors ({np.round(diff.max(), 3)}) "
             f"in sum(mass fractions). Evolution will likely fail to conserve mass."
