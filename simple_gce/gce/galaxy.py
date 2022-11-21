@@ -1,6 +1,7 @@
 import copy
 from dataclasses import dataclass
 from typing import List, Tuple
+import warnings
 
 import numpy as np
 from scipy import interpolate
@@ -71,11 +72,22 @@ class Galaxy(object):
     def __init__(self):
 
         # Load the stellar model yields (CC, AGB, etc.)
-        stellar_models = load_stellar_models.generate_stellarmodels_dataclass()
-        self.stellar_models = stellar_models
-        self.include_hn = bool(config.STELLAR_MODELS["include_hn"])
+        self.stellar_models = load_stellar_models.generate_stellarmodels_dataclass()
+        # Initialise the Ia model parameters
+        self.ia_system = load_stellar_models.generate_iasystem_dataclass()
+
+        if not np.all(self.stellar_models.elements == self.ia_system.elements):
+            missing_el_stellar = list(set(self.ia_system.elements) - set(self.stellar_models.elements))
+            missing_el_ia = list(set(self.stellar_models.elements) - set(self.ia_system.elements))
+            warnings.warn(
+                "Elements included in Ia ejecta must be the same as "
+                "those in the stellar model yields (CCSNe/winds)."
+            )
+            self.stellar_models = load_stellar_models.generate_stellarmodels_dataclass(additional_elements=missing_el_stellar)
+            self.ia_system = load_stellar_models.generate_iasystem_dataclass(additional_elements=missing_el_ia)
 
         # Initialise variables (from config where appropriate).
+        self.include_hn = bool(config.STELLAR_MODELS["include_hn"])
         self.time = 0.0
         self.z = config.GALAXY_PARAMS["z_init"]
         self.gas_mass = 0.0
@@ -110,13 +122,6 @@ class Galaxy(object):
             mass_min=config.IMF_PARAMS["mass_min"],
             mass_max=config.IMF_PARAMS["mass_max"],
         )
-        # Initialise the Ia model parameters
-        self.ia_system = load_stellar_models.generate_iasystem_dataclass()
-        if self.ia_system.x_idx != self.stellar_models.x_idx:
-            raise error_handling.NotImplementedError(
-                "Elements included in Ia ejecta must be the same as "
-                "those in the stellar model yields (CCSNe/winds)."
-            )
 
         self.f_sfr = lambda x: np.ones_like(x) * config.GALAXY_PARAMS["sfr_init"]
         self.f_z = lambda x: np.ones_like(x) * config.GALAXY_PARAMS["z_init"]

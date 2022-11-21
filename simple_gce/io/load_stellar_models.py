@@ -77,21 +77,21 @@ def read_ia_csv() -> pd.Series:
     return df
 
 
-def generate_stellarmodels_dataclass() -> dataclass:
+def generate_stellarmodels_dataclass(additional_elements: List[Tuple] = None) -> dataclass:
     """Load stellar data CSV and use to generate a StellarModels dataclass."""
     model_data = read_stellar_csv()
-    stellar_models = create_stellarmodels_dataclass_from_df(model_data)
+    stellar_models = create_stellarmodels_dataclass_from_df(model_data, additional_elements)
     return stellar_models
 
 
-def generate_iasystem_dataclass() -> dataclass:
+def generate_iasystem_dataclass(additional_elements: List[Tuple] = None) -> dataclass:
     """Load Ia data CSV and use to generate a IaSystem dataclass."""
     model_data = read_ia_csv()
-    ia_system = create_iasystem_dataclass_from_df(model_data)
+    ia_system = create_iasystem_dataclass_from_df(model_data, additional_elements)
     return ia_system
 
 
-def create_stellarmodels_dataclass_from_df(models: pd.DataFrame) -> dataclass:
+def create_stellarmodels_dataclass_from_df(models: pd.DataFrame, additional_elements: List[Tuple] = None) -> dataclass:
     """Read dataframe to populate StellarModels attributes."""
     include_hn = config.STELLAR_MODELS["include_hn"]
     non_metals = config.GALAXY_PARAMS["non_metals"]
@@ -104,6 +104,9 @@ def create_stellarmodels_dataclass_from_df(models: pd.DataFrame) -> dataclass:
     }
     elements = list(element_map.values())
     models.rename(columns=element_map, inplace=True)
+    if additional_elements is not None:
+        elements.extend(additional_elements)
+        models[additional_elements] = 0.0
     # Sort by charge number and secondarily by mass number
     elements.sort(key=lambda el: (el2z[el[0]], el[1]))
     # Store the index for each element in the array, and record the non-metals.
@@ -223,7 +226,7 @@ def create_stellarmodels_dataclass_from_df(models: pd.DataFrame) -> dataclass:
     return stellar_models
 
 
-def create_iasystem_dataclass_from_df(model: pd.DataFrame) -> dataclass:
+def create_iasystem_dataclass_from_df(model: pd.DataFrame, additional_elements: List[Tuple] = None) -> dataclass:
     """Read dataframe to populate IaSystem attributes."""
     el2z = chem_elements.el2z
     # Include only the elements listed in the dataset.
@@ -234,6 +237,9 @@ def create_iasystem_dataclass_from_df(model: pd.DataFrame) -> dataclass:
     }
     elements = list(element_map.values())
     model.rename(columns=element_map, inplace=True)
+    if additional_elements is not None:
+        elements.extend(additional_elements)
+        model[additional_elements] = 0.0
     # Sort by charge number and secondarily by mass number
     elements.sort(key=lambda el: (el2z[el[0]], el[1]))
     # Store the index for each element in the array.
@@ -271,6 +277,7 @@ def create_iasystem_dataclass_from_df(model: pd.DataFrame) -> dataclass:
     ia_system = IaSystem(
         x_ia=x_ia,
         x_idx=x_idx,
+        elements=elements,
         mass_co=mass_co,
         imf_donor_slope=imf_donor_slope,
         mdl_rg=mdl_rg,
@@ -365,6 +372,8 @@ class IaSystem:
         Chemical abundances (mass fractions) in the ejecta of SNe Ia.
     x_idx: dict[Tuple, int]
         Dictionary mapping elements to their index in arrays containing chemical abundances.
+    elements: (E,) list[str]
+        The chemical elements included in the evolution.
     mass_co: float
         The mass of the CO white dwarf (solar mass).
     imf_donor_slope: float
@@ -393,6 +402,7 @@ class IaSystem:
 
     x_ia: np.array
     x_idx: Dict[str, int]
+    elements: List[Tuple[str, int]]
     mass_co: float
     imf_donor_slope: float
     mdl_rg: float
