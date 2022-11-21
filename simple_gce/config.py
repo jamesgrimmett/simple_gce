@@ -11,10 +11,10 @@ INSTALL_DIR = pathlib.Path(__file__).parent.parent.absolute()
 FILEPATHS = {
     # Path to stellar models. Must be a list, even if singular.
     "stellar_models": [
-        os.path.join(INSTALL_DIR, "data/kobayashi-2006/kobayashi-2006_sn_scaled.csv"),
-        os.path.join(INSTALL_DIR, "data/kobayashi-2006/kobayashi-2006_hn_scaled.csv"),
+        os.path.join(INSTALL_DIR, "data/kobayashi-2006/kobayashi-2006_table1.csv"),
+        os.path.join(INSTALL_DIR, "data/kobayashi-2006/kobayashi-2006_table2.csv"),
     ],
-    "ia_model": os.path.join(INSTALL_DIR, "data/kobayashi-2006/kobayashi-2006_ia_scaled.csv"),
+    "ia_model": os.path.join(INSTALL_DIR, "data/kobayashi-2006/kobayashi-2006_table3_ia.csv"),
 }
 
 IMF_PARAMS = {
