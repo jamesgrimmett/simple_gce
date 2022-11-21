@@ -25,7 +25,7 @@ def test_parse_chemical_symbol(symbol, expected):
 @pytest.mark.parametrize("symbol", ["1", "12Carbon", "Hydrogen"])
 def test_parse_chemical_symbol_silent(symbol):
     result = chem_elements.parse_chemical_symbol(symbol, silent=True)
-    assert result is None
+    assert result == (None, None)
 
 
 @pytest.mark.parametrize("symbol", ["1", "12Carbon", "Hydrogen"])
