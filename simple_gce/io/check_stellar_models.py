@@ -223,12 +223,12 @@ def check_massfracs(df: pd.DataFrame) -> pd.DataFrame:
     sum_ejecta = df[elements].sum(axis=1)
     total_ejecta_mass = df.mass_final - df.remnant_mass
 
-    if all(abs(1.0 - sum_ejecta / total_ejecta_mass) <= 1.e-2):
+    if all(abs(1.0 - sum_ejecta / total_ejecta_mass) <= 1.0e-2):
         warnings.warn(
             "It appears that ejecta composition has been supplied in units of absolute "
             "mass. Rescaling to mass fractions."
         )
-        scale = 1 / total_ejecta_mass
+        scale = 1 / sum_ejecta
         df.loc[:, elements] = df[elements].mul(scale, axis="rows")
         sum_ejecta = df[elements].sum(axis=1)
 
