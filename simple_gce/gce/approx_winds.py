@@ -21,7 +21,9 @@ def fill_agb(stellar_models: pd.DataFrame) -> pd.DataFrame:
         [max(mass_min_agb, 1.5 * config.IMF_PARAMS["mass_min"])] + [i for i in np.arange(1, 10)]
     )
     cols = stellar_models.columns
-    elements = list(set(cols).intersection(set(el2z.keys())))
+    elements = [
+        col for col in cols if chem_elements.parse_chemical_symbol(col, silent=True) != (None, None)
+    ]
     models_agb = pd.DataFrame(np.zeros((len(m_vals) * len(z_vals), len(cols))), columns=cols)
 
     z_m = itertools.product(z_vals, m_vals)
