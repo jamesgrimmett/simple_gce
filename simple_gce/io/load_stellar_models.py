@@ -106,7 +106,10 @@ def create_stellarmodels_dataclass_from_df(models: pd.DataFrame, additional_elem
     models.rename(columns=element_map, inplace=True)
     if additional_elements is not None:
         elements.extend(additional_elements)
-        models[additional_elements] = 0.0
+        # Set additional elements as either zero or nan
+        where_composition_isnan = np.isnan(models[element_map.values()]).all(axis=1)
+        models.loc[where_composition_isnan, additional_elements] = np.nan
+        models.loc[~where_composition_isnan, additional_elements] = 0.0
     # Sort by charge number and secondarily by mass number
     elements.sort(key=lambda el: (el2z[el[0]], el[1]))
     # Store the index for each element in the array, and record the non-metals.
