@@ -77,14 +77,20 @@ class Galaxy(object):
         self.ia_system = load_stellar_models.generate_iasystem_dataclass()
 
         if not np.all(self.stellar_models.elements == self.ia_system.elements):
-            missing_el_stellar = list(set(self.ia_system.elements) - set(self.stellar_models.elements))
+            missing_el_stellar = list(
+                set(self.ia_system.elements) - set(self.stellar_models.elements)
+            )
             missing_el_ia = list(set(self.stellar_models.elements) - set(self.ia_system.elements))
             warnings.warn(
                 "Elements included in Ia ejecta must be the same as "
                 "those in the stellar model yields (CCSNe/winds)."
             )
-            self.stellar_models = load_stellar_models.generate_stellarmodels_dataclass(additional_elements=missing_el_stellar)
-            self.ia_system = load_stellar_models.generate_iasystem_dataclass(additional_elements=missing_el_ia)
+            self.stellar_models = load_stellar_models.generate_stellarmodels_dataclass(
+                additional_elements=missing_el_stellar
+            )
+            self.ia_system = load_stellar_models.generate_iasystem_dataclass(
+                additional_elements=missing_el_ia
+            )
 
         # Initialise variables (from config where appropriate).
         self.include_hn = bool(config.STELLAR_MODELS["include_hn"])

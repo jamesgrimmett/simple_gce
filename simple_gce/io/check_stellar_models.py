@@ -9,12 +9,12 @@ from ..gce import approx_lifetime, approx_winds
 from ..utils.chem_elements import parse_chemical_symbol
 
 REQUIRED_COLUMNS = [
-    "mass",         # ZAMS mass
-    "mass_final",   # Final mass (e.g. presupernova, after wind-loss)
-    "type",         # CC, AGB, Ia
-    "remnant_mass", # Mass of the compact remnant.
-    "Z",            # Initial metallicity
-    "lifetime",     # Stellar lifetime.
+    "mass",  # ZAMS mass
+    "mass_final",  # Final mass (e.g. presupernova, after wind-loss)
+    "type",  # CC, AGB, Ia
+    "remnant_mass",  # Mass of the compact remnant.
+    "Z",  # Initial metallicity
+    "lifetime",  # Stellar lifetime.
 ]
 
 OPTIONAL_COLUMNS = ["expl_energy"]

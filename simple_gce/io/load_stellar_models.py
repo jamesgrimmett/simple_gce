@@ -48,7 +48,7 @@ def read_ia_csv() -> pd.Series:
     sum_ejecta = float(df.sum(axis="columns"))
     ia_total_mass = config.IA_PARAMS["mass_co"]
 
-    if abs(1.0 - sum_ejecta / ia_total_mass) <= 1.e-2:
+    if abs(1.0 - sum_ejecta / ia_total_mass) <= 1.0e-2:
         warnings.warn(
             "It appears that Ia ejecta composition has been supplied in units of "
             "absolute mass. Rescaling to mass fraction."
@@ -91,7 +91,9 @@ def generate_iasystem_dataclass(additional_elements: List[Tuple] = None) -> data
     return ia_system
 
 
-def create_stellarmodels_dataclass_from_df(models: pd.DataFrame, additional_elements: List[Tuple] = None) -> dataclass:
+def create_stellarmodels_dataclass_from_df(
+    models: pd.DataFrame, additional_elements: List[Tuple] = None
+) -> dataclass:
     """Read dataframe to populate StellarModels attributes."""
     include_hn = config.STELLAR_MODELS["include_hn"]
     non_metals = config.GALAXY_PARAMS["non_metals"]
@@ -229,7 +231,9 @@ def create_stellarmodels_dataclass_from_df(models: pd.DataFrame, additional_elem
     return stellar_models
 
 
-def create_iasystem_dataclass_from_df(model: pd.DataFrame, additional_elements: List[Tuple] = None) -> dataclass:
+def create_iasystem_dataclass_from_df(
+    model: pd.DataFrame, additional_elements: List[Tuple] = None
+) -> dataclass:
     """Read dataframe to populate IaSystem attributes."""
     el2z = chem_elements.el2z
     # Include only the elements listed in the dataset.
