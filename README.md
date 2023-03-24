@@ -1,6 +1,6 @@
 # `simpleGCE`
 
-A simple one-zone Galactic Chemical Evolution model, as used in [Grimmett et al. (2020)](https://arxiv.org/abs/1911.05901). 
+A simple one-zone Galactic Chemical Evolution model.
 
 `simpleGCE` solves the set of differential equations that represent a simplified model for an evolving galaxy.
 This model allows for the infall of material from the Galactic halo (i.e. open box), and assumes homogeneous evolution (i.e. instantaneous mixing).
